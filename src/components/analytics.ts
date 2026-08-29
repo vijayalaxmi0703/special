@@ -1,21 +1,27 @@
 import { supabase } from "../lib/supabase";
 
 /**
- * TEMPORARY DIAGNOSTIC BUILD.
+ * Analytics: fire-and-forget, append-only event logging.
+ * Every track() call is a single INSERT into the existing Supabase
+ * table — events are never updated or deleted, so a session's full
+ * journey stays intact even after "completed" is recorded.
  */
 
 export type AnalyticsEvent =
   | "page_opened"
+  | "hi_shown"
+  | "question_shown"
+  | "no_clicked"
   | "no_attempt"
   | "yes_clicked"
-  | "crown_started"
-  | "hug_started"
-  | "experience_completed";
+  | "dr_scene"
+  | "crown_scene"
+  | "hug_scene"
+  | "completed";
 
 const SESSION_KEY = "teacher_day_session";
 
 function createSessionId(): string {
-  // Modern browsers
   if (
     typeof crypto !== "undefined" &&
     typeof crypto.randomUUID === "function"
@@ -23,7 +29,7 @@ function createSessionId(): string {
     return crypto.randomUUID();
   }
 
-  // Fallback for HTTP/LAN environments where randomUUID isn't available
+  // Fallback for environments where randomUUID isn't available
   return (
     Date.now().toString(36) +
     "-" +
@@ -44,21 +50,12 @@ function getSessionId(): string {
 
     return sessionId;
   } catch (e) {
-    console.error("[analytics] sessionStorage THREW:", e);
-
+    if (import.meta.env.DEV) {
+      console.error("[analytics] sessionStorage threw:", e);
+    }
     return "no-storage-" + createSessionId();
   }
 }
-
-console.log("[analytics] MODULE LOADED. Env check:", {
-  hasUrl: !!import.meta.env.VITE_SUPABASE_URL,
-  hasKey: !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-});
-
-console.log(
-  "[analytics] Supabase URL:",
-  import.meta.env.VITE_SUPABASE_URL
-);
 
 async function send(
   event: AnalyticsEvent,
@@ -66,35 +63,30 @@ async function send(
 ) {
   const session_id = getSessionId();
 
-  console.log("[analytics] INSERTING:", {
-    event,
-    session_id,
-    meta,
-  });
+  if (import.meta.env.DEV) {
+    console.log("[analytics] inserting:", { event, session_id, meta });
+  }
 
   try {
+    // Always an INSERT — analytics rows are append-only. Never call
+    // .update()/.upsert() here; a later event (e.g. "completed") must
+    // never overwrite or remove an earlier row.
     const { error } = await supabase
       .from("teacher_day_events")
-      .insert({
-        event,
-        session_id,
-      });
+      .insert({ event, session_id });
 
-    if (error) {
-      console.error("[analytics] INSERT FAILED:", {
+    if (error && import.meta.env.DEV) {
+      console.error("[analytics] insert failed:", {
         message: error.message,
         details: error.details,
         hint: error.hint,
         code: error.code,
       });
-    } else {
-      console.log("[analytics] INSERT SUCCESS");
     }
   } catch (thrown) {
-    console.error(
-      "[analytics] send() THREW:",
-      thrown
-    );
+    if (import.meta.env.DEV) {
+      console.error("[analytics] send() threw:", thrown);
+    }
   }
 }
 
@@ -102,11 +94,5 @@ export function track(
   event: AnalyticsEvent,
   meta?: Record<string, unknown>
 ) {
-  console.log(
-    "[analytics] TRACK CALLED:",
-    event,
-    meta ?? {}
-  );
-
   void send(event, meta);
 }

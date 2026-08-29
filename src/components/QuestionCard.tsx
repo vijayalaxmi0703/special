@@ -40,12 +40,13 @@ import { useEffect, useRef, useState } from "react";
  */
 
 const REACTIONS = [
-    "I understand, Mam. You're being modest.",
-    "But I must respectfully disagree. 😊",
-    "I think you may be underestimating yourself, Mam.",
+    "Wait— you actually clicked No?.Hmm… I knew you might say that.But unfortunately, I don't think I'm going to accept that answer.🤭",
+    "I'll pretend I didn't see that.,reconsider mam",
+    "Due to this bunny respectfully disagreeing, the No button has been politely dismissed.😄",
+    "Well… I suppose there's only one option left now, Mam.😁hehe"
 ];
 const MAX_NO_ATTEMPTS = REACTIONS.length;
-const REACTION_HOLD_MS = 2200;
+const REACTION_HOLD_MS = 5200;
 
 /** How much bigger the 3rd/final escape is than a normal hop, and how
     long NO stays visible after that final hop before it's removed —
