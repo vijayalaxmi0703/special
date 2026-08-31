@@ -62,6 +62,18 @@ async function send(
   event: AnalyticsEvent,
   meta?: Record<string, unknown>
 ) {
+  // FIX: `supabase` is `null` whenever VITE_SUPABASE_URL /
+  // VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) aren't
+  // configured — see src/lib/supabase.ts. No-op here instead of calling
+  // .from() on null, which would throw. The site continues working
+  // normally either way; only event tracking is skipped.
+  if (!supabase) {
+    if (import.meta.env.DEV) {
+      console.log("[analytics] skipped (Supabase not configured):", event);
+    }
+    return;
+  }
+
   const session_id = getSessionId();
 
   if (import.meta.env.DEV) {

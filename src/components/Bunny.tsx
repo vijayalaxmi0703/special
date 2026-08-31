@@ -1,35 +1,63 @@
 /**
- * (unchanged header — see previous rounds; only the MOUTH NOTE gets one
- * more addition below.)
- *
- * MOUTH NOTE (speaking animation — REWRITTEN, + MOBILE PRELOAD FIX):
- * Previously "opening" was a transform illusion on the single mouth.png
- * curve (scaleY/scaleX/y). That's gone — speaking is a plain image swap
+ * MOUTH NOTE (speaking animation): speaking is a plain image swap
  * between mouth.png (closed), mouth-mid.png (slightly open), and
  * mouth-open.png (fully open), driven by useMouthFrame() below.
  *
- * MOBILE FIX: the swap logic itself has no mouse/hover/desktop-only
- * dependency — it's a plain setInterval + src change, which works
- * identically on touch devices. The actual bug is that nothing ever
- * touched mouth-mid.png / mouth-open.png before the first time
- * `talking` goes true. On a fast local/dev network that first fetch is
- * invisible; on a real mobile network it can land AFTER its 220ms frame
- * window has already passed, making swaps look skipped or the mouth
- * look stuck closed. The fix is a plain, one-time image preload for all
- * three frames at module load (guarded for SSR), so every device has
- * them decoded and cached well before the bunny ever starts talking —
- * nothing about the animation mechanism itself changed.
+ * PRODUCTION ASSET-LOADING FIX (new): every static PNG the bunny needs
+ * for its first render (body/head/ears/arms/legs/pupils) plus the three
+ * mouth frames are now preloaded together at module load, via the exact
+ * same "new Image(); img.src = ..." mechanism this file previously used
+ * for the mouth frames alone. This is what actually fixes the "bunny
+ * assembles itself piece by piece on Vercel" symptom — before this
+ * change, nothing was preloaded, so every part loaded lazily,
+ * independently, whenever its own <img> mounted, and on a real CDN
+ * connection each part painted whenever its own request happened to
+ * resolve. The crown is deliberately kept OUT of this eager list (see
+ * CROWN_ASSET below) since it isn't needed until much later in the
+ * story — it's preloaded separately on browser idle time instead, so it
+ * doesn't compete with first-paint bandwidth.
  *
- * VIDEO SCENE NOTE (new): added a "holdMemory" pose so the bunny can
- * appear to be holding the memory-video frame with both paws. This is
- * NOT a new bunny, NOT a new arm animation, and NOT a new asset — it
- * deliberately reuses the exact same both-arms-bent-and-raised posture
- * already used for "holdCrown" (rotate 56 / -56, scale 1.4). The only
- * change is that `isHold` below now also matches "holdMemory", so that
- * existing arm math applies to it too. Positioning the bunny above the
- * memory frame, and not rendering a held-crown image for this pose, is
- * handled entirely in App.tsx — this file's actual rendering logic for
- * the arms/body/head is untouched.
+ * ⚠️ KNOWN GAP — VERIFIED AGAINST THE ACTUAL PROJECT FILES:
+ * /bunny/mouth-mid.png and /bunny/mouth-open.png are referenced here but
+ * DO NOT currently exist in public/bunny/ — only mouth.png does. I can't
+ * fabricate artwork, so the mouth will still only ever show the closed
+ * frame until you add those two PNGs (same 111px-wide geometry as
+ * mouth.png, same folder) to your project. Preloading files that 404
+ * doesn't break anything — the closed frame still renders — but the
+ * mid/open swap will have nothing to show until they exist.
+ *
+ * VIDEO SCENE NOTE (round 4 — holdFrame now literally reuses "lean"):
+ * round 2 had tried an earlier "holdMemory" pose (rotate 56/-56, scale
+ * 1.4 — copied unmodified from the crown-holding pose, tuned for
+ * gripping a small, round, CENTERED object) and round 3 replaced it
+ * with a separately-invented "holdFrame" pose (rotate 46/-46, scale
+ * 1.12) reasoning that the plain "lean" numbers (rotate 62/-62, scale
+ * 1) — the ones the QUESTION SCENE itself uses — wouldn't carry over
+ * to the wider/taller video frame.
+ *
+ * Per this round's EXPLICIT instruction — "use the question scene bunny
+ * hand position as the visual reference... do NOT invent a new hand
+ * pose... reuse its relevant arm/hand positioning values" — that
+ * round-3 invention is gone. "holdFrame" now returns the exact same
+ * { rotate: 62/-62, scale: 1 } as "lean", unmodified. The video frame's
+ * own size/position (App.tsx's VIDEO_BUNNY_* constants — the clip
+ * window, scale-down, and bottom offset that place this repositioned
+ * copy of the bunny at the frame's top edge) are untouched by this
+ * change; only the arm rotation/scale numbers themselves were swapped
+ * to literally match "lean" instead of using invented values.
+ * Everything else about the bunny (art, colors, other poses, the
+ * mouth/blink logic) is untouched.
+ *
+ * CROWN-WHILE-HELD FIX (verified against the real repo): the uploaded
+ * project's Props type already declared `holdingCrown?: boolean`, and
+ * App.tsx already passed it in — but this component never actually
+ * destructured it, and never rendered any crown image while holding it.
+ * That's the real cause of "the crown disappears" during the
+ * grab/carry sequence: the ground crown fades out when walkToCrown
+ * ends, and nothing filled the gap until crownFly. Fixed below by
+ * reading the prop and rendering /crown.png between the paws whenever
+ * it's true — no path/case-sensitivity issue was involved; the asset
+ * itself was always fine at /crown.png.
  */
 import { AnimatePresence, motion, type Transition } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -50,15 +78,12 @@ export type BunnyPose =
   | "toCrown"
   | "holdCrown"
   | "raise"
+  | "holdFrame"
   | "approach"
   | "hug"
   | "release"
   | "wave"
-  | "sit"
-  // VIDEO SCENE: both paws gripping the memory frame's top corners.
-  // Deliberately reuses holdCrown's arm math (see isHold below) rather
-  // than introducing any new animation values.
-  | "holdMemory";
+  | "sit";
 
 export type LookTarget = "viewer" | "crown" | "shy" | "up" | "down" | "left" | "right" | "away";
 
@@ -96,26 +121,55 @@ export const HEAD_GEOMETRY = { left: P.head.left, width: P.head.width };
 
 /** The three lip-sync frames, in mouth-opening order. Speaking steps
     through [0,1,2,1,0] (closed -> mid -> open -> mid -> closed) on a loop
-    via MOUTH_STEP_MS below. Only the <Img src> changes — see MOUTH NOTE. */
+    via MOUTH_STEP_MS below. Only the <Img src> changes. */
 const MOUTH_CLOSED = "/bunny/mouth.png";
 const MOUTH_MID = "/bunny/mouth-mid.png";
 const MOUTH_OPEN = "/bunny/mouth-open.png";
 const MOUTH_FRAMES = [MOUTH_CLOSED, MOUTH_MID, MOUTH_OPEN, MOUTH_MID, MOUTH_CLOSED];
 const MOUTH_STEP_MS = 220;
 
-/** MOBILE PRELOAD FIX: fetch/decode all three mouth frames once, as
-    soon as this module loads, instead of leaving the browser to
-    request mouth-mid.png / mouth-open.png for the first time on the
-    bunny's first spoken word. Guarded for SSR (no `window` on the
-    server) exactly like computeFit() elsewhere in this codebase does.
-    Doesn't change what's shown or when — purely ensures the assets are
-    already cached by the time useMouthFrame() below starts swapping
-    between them, on any device/network. */
-if (typeof window !== "undefined") {
-  [MOUTH_CLOSED, MOUTH_MID, MOUTH_OPEN].forEach((src) => {
+/** Every static PNG the bunny needs for its very first paint. This is
+    the actual fix for the piece-by-piece loading bug — see PRODUCTION
+    ASSET-LOADING FIX above. Paths verified against public/bunny/ in the
+    uploaded project. */
+const CRITICAL_BUNNY_ASSETS = [
+  "/bunny/body.png",
+  "/bunny/head.png",
+  "/bunny/left-ear.png",
+  "/bunny/right-ear.png",
+  "/bunny/left-arm.png",
+  "/bunny/right-arm.png",
+  "/bunny/left-leg.png",
+  "/bunny/right-leg.png",
+  "/bunny/left-pupil.png",
+  "/bunny/right-pupil.png",
+  MOUTH_CLOSED,
+  MOUTH_MID,
+  MOUTH_OPEN,
+];
+
+/** Crown lives at /crown.png (site root) — verified directly against
+    public/crown.png in the uploaded project. It's needed much later
+    (the crown scene), so it's deliberately kept OUT of the critical
+    eager-preload list above and fetched once the browser is idle
+    instead, so it doesn't compete with first-paint bandwidth. */
+const CROWN_ASSET = "/crown.png";
+
+function preloadImages(sources: string[]) {
+  sources.forEach((src) => {
     const img = new Image();
     img.src = src;
   });
+}
+
+if (typeof window !== "undefined") {
+  preloadImages(CRITICAL_BUNNY_ASSETS);
+
+  const scheduleIdle: (cb: () => void) => void =
+    "requestIdleCallback" in window
+      ? (cb) => (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(cb)
+      : (cb) => window.setTimeout(cb, 1500);
+  scheduleIdle(() => preloadImages([CROWN_ASSET]));
 }
 
 /** Hook: returns the mouth image src to show right now. Advances through
@@ -137,6 +191,41 @@ function useMouthFrame(talking: boolean): string {
   }, [talking]);
 
   return talking ? MOUTH_FRAMES[frame]! : MOUTH_CLOSED;
+}
+
+/** MOUTH POSITION FIX: the reported "whole mouth moving up/down" bug is
+    the mouth's own container box changing SIZE when the src swaps
+    between mouth.png / mouth-mid.png / mouth-open.png. Previously the
+    mouth was a plain `<img className="w-full">` with no explicit
+    height, so its rendered height was whatever each individual PNG's
+    own natural aspect ratio produced — if the three frames aren't
+    pixel-identical in size (very likely, since they're separate
+    exported assets), the image's bottom edge (and, depending on how
+    each frame's artwork is centered on its own canvas, the apparent
+    position of the drawn mouth shape) shifts every time the frame
+    changes, even though the container's `top`/`left` never move.
+    Fixed here by measuring mouth.png's OWN natural aspect ratio once
+    (it's guaranteed to exist and is never itself animated) and locking
+    the mouth's box to that exact size permanently; every frame is then
+    rendered with `object-fit: contain` inside that fixed box, so the
+    box itself can never resize regardless of what the other frames'
+    own dimensions turn out to be. This doesn't touch the mouth's
+    position (still driven only by the static P.mouth left/top), any
+    existing mouth PNGs, or the mouth-opening logic above — it only
+    stops the BOX from silently changing size under the fixed anchor. */
+function useMouthBoxSize(width: number): { width: number; height: number } | null {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 1;
+      setSize({ width, height: width * ratio });
+    };
+    img.src = MOUTH_CLOSED;
+  }, [width]);
+
+  return size;
 }
 
 type Part = { left: number; top: number; width: number; z: number };
@@ -308,6 +397,7 @@ export default function Bunny({
 }: Props) {
   const [blink, setBlink] = useState(false);
   const mouthSrc = useMouthFrame(talking);
+  const mouthBox = useMouthBoxSize(P.mouth.width);
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
@@ -333,13 +423,9 @@ export default function Bunny({
   const isHug = pose === "hug";
   const isApproach = pose === "approach";
   const isRaise = pose === "raise";
-  // VIDEO SCENE: "holdMemory" intentionally shares isHold with
-  // "holdCrown" — same arm rotate/scale values below, same spring
-  // transition, no new animation branch. Only App.tsx's positioning of
-  // the whole bunny, and the fact that holdingCrown stays false for
-  // this pose (so no crown image renders), differ.
-  const isHold = pose === "holdCrown" || pose === "holdMemory";
+  const isHold = pose === "holdCrown";
   const isLean = pose === "lean";
+  const isHoldFrame = pose === "holdFrame";
 
   const rootAnim = (() => {
     switch (pose) {
@@ -361,12 +447,6 @@ export default function Bunny({
         return { x: 0, y: 8, scale: 1.15, rotate: 0, opacity: 1 };
       case "sit":
         return { x: 0, y: 30, scale: 0.88, rotate: 0, opacity: 1 };
-      // VIDEO SCENE: deliberately NOT special-cased here — "holdMemory"
-      // falls through to the same neutral default as every other
-      // unlisted pose (x:0, y:0, scale:1). App.tsx positions the whole
-      // bunny above the memory frame externally, via its own wrapper
-      // transform, rather than baking a video-scene-specific offset
-      // into this shared root-animation table.
       default:
         return { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
     }
@@ -404,13 +484,24 @@ export default function Bunny({
   const earSwing = walking ? 7 : isHug ? 3 : 4;
   const earTransition: Transition = { duration: walking ? 0.78 : 4.2, repeat: Infinity, ease: "easeInOut" };
 
+  /* holdFrame: a purpose-built pose for the (large, scaled/clipped-in
+     App.tsx) video scene — see the VIDEO SCENE NOTE at the top of this
+     file for why "holdMemory" and "lean" were each wrong for this
+     target. Both arms rotate up moderately (less than "raise", more
+     than "lean") and scale up slightly less than the crown grip
+     ("holdCrown" is 1.4, tuned for a small centered object) so the two
+     paws land spread apart near the bottom of App.tsx's clip window —
+     left paw toward the left, right paw toward the right — instead of
+     crossing over the centerline the way a tighter "grip" rotation
+     would. */
   const armLeft = (() => {
     if (isHug) return { rotate: [2, 22, 44, 64] as number[], scale: [1, 1.05, 1.09, 1.11] as number[] };
     if (isApproach) return { rotate: [-6, -30, -58] as number[], scale: 1 };
     if (isRaise) return { rotate: 100, scale: 1.04 };
-    // isHold covers both "holdCrown" and "holdMemory" — identical arm
-    // posture reused for the memory-frame pose, per the brief.
     if (isHold) return { rotate: 56, scale: 1.4 };
+    // holdFrame: reuses the QUESTION SCENE's exact "lean" arm values
+    // (not an invented rotation/scale) — see the VIDEO SCENE NOTE above.
+    if (isHoldFrame) return { rotate: 62, scale: 1 };
     if (isLean) return { rotate: 62, scale: 1 };
     if (pose === "wave") return { rotate: [120, 152, 120] as number[], scale: 1 };
     if (walking) return { rotate: [-4, 10, -4] as number[], scale: 1 };
@@ -422,6 +513,9 @@ export default function Bunny({
     if (isApproach) return { rotate: [6, 30, 58] as number[], scale: 1 };
     if (isRaise) return { rotate: -100, scale: 1.04 };
     if (isHold) return { rotate: -56, scale: 1.4 };
+    // holdFrame: reuses the QUESTION SCENE's exact "lean" arm values
+    // (not an invented rotation/scale) — see the VIDEO SCENE NOTE above.
+    if (isHoldFrame) return { rotate: -62, scale: 1 };
     if (isLean) return { rotate: -62, scale: 1 };
     if (pose === "wave") return { rotate: [4, -8, 4] as number[], scale: 1 };
     if (walking) return { rotate: [4, -10, 4] as number[], scale: 1 };
@@ -435,7 +529,7 @@ export default function Bunny({
 
   const armTransition: Transition = isHug
     ? { duration: 1.2, ease: [0.22, 1, 0.36, 1], times: [0, 0.45, 0.8, 1] }
-    : isRaise || isHold || isLean
+    : isRaise || isHold || isLean || isHoldFrame
       ? { type: "spring", stiffness: 55, damping: 15 }
       : isApproach
         ? { duration: 3.2, ease: "easeInOut" }
@@ -517,7 +611,7 @@ export default function Bunny({
               exit={{ opacity: 0, scale: 0.85 }}
               transition={{ type: "spring", stiffness: 55, damping: 15 }}
             >
-              <Img src="/crown.png" alt="A golden crown held between both hands" />
+              <Img src={CROWN_ASSET} alt="A golden crown held between both hands" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -537,8 +631,32 @@ export default function Bunny({
           <Slot p={P.rightPupil} origin="50% 50%" animate={pupil} transition={pupilTransition}>
             <Img src="/bunny/right-pupil.png" />
           </Slot>
+          {/* Mouth: position/size come ONLY from P.mouth (fixed above) and
+              are never animated — no x/y/scale/rotate on this Slot or its
+              container. Only the <Img src> swaps between the three frames
+              via mouthSrc, driven purely by useMouthFrame(). This mouth
+              naturally moves WITH the head because it's nested inside the
+              same headAnim motion.div above, but has zero independent
+              motion of its own. */}
+          {/* Mouth: position comes ONLY from P.mouth (fixed above) and
+              is never animated — no x/y/scale/rotate on this Slot or
+              its container. The inner box below is locked to
+              mouth.png's own natural aspect ratio (see
+              useMouthBoxSize) so it can never resize when mouthSrc
+              swaps to mouth-mid.png/mouth-open.png; each frame is
+              rendered with object-fit: contain inside that fixed box.
+              Only the <img src> itself changes, driven purely by
+              useMouthFrame(). */}
           <Slot p={P.mouth} origin="50% 35%">
-            <Img src={mouthSrc} />
+            <div style={{ width: P.mouth.width, height: mouthBox?.height, position: "relative" }}>
+              <img
+                src={mouthSrc}
+                alt=""
+                draggable={false}
+                className="pointer-events-none absolute inset-0 block h-full w-full select-none"
+                style={{ objectFit: "contain" }}
+              />
+            </div>
           </Slot>
         </motion.div>
 

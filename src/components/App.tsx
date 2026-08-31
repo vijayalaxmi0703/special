@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Bunny, { HEAD_GEOMETRY, STAGE_H, STAGE_W, type BunnyPose, type IntroPhase, type LookTarget } from "./Bunny";
 import { Background, CrownGlow, Dialogue } from "./Scenery";
 import QuestionCard from "./QuestionCard";
-import VideoScene from "./VideoScene";
+import VideoScene, { type VideoSceneHandle } from "./VideoScene";
 import { track } from "./analytics";
 
 /** 🚨 No teacher name was present anywhere in the project files or
@@ -21,10 +21,10 @@ export const DIALOGUE_LINES: string[] = [
   "I hope you're doing well.",
   "I just wanted to say a few things to you ..",
   "So please bear with me for just a few minutes😅.",
-   "mam i could have just wished u today but..",
+  "mam i could have just wished u today but..",
   "I have spent days coding this for u cuz ...",
   "I just wanted u to feel special today and hopefully make u smile a little",
-  
+
 ];
 
 export const HUG_LINES: string[] = [
@@ -55,44 +55,32 @@ const peekTransition = { duration: 1.1, ease: [0.22, 1, 0.36, 1] as const };
 /* ================================================================== *
 * VIRTUAL TIMELINE
 *
-* Same architecture as before: everything on screen is a pure function
-* of one number, `elapsed`. Autoplay increments it every frame; the
-* hidden nav adds/subtracts from it; the question gate simply caps how
-* far forward it's allowed to go until answered.
+* Everything on screen is a pure function of one number, `elapsed`.
+* Autoplay increments it every frame; the hidden nav adds/subtracts
+* from it; the question gate simply caps how far forward it's allowed
+* to go until answered.
 *
-* READING-TIME FIX: every caption used to hold for a flat 2000ms
-* regardless of length. That fixed duration is gone. Instead, each
-* phase's line array (TEXT_LINES) is run through `buildPhaseLines()`,
-* which gives every individual line its own duration via
-* `readDuration()` — longer sentences hold longer, short ones don't
+* Each phase's line array (TEXT_LINES) is run through
+* buildPhaseLines(), which gives every individual line its own duration
+* via readDuration() — longer sentences hold longer, short ones don't
 * linger — and a phase's total duration in FLOW_DURATIONS is just the
-* sum of its lines' durations. This is still entirely inside the same
-* resolveTimeline() pass over TIMELINE; there is no separate per-message
-* setTimeout anywhere. `hug` is now folded into this exact same
-* mechanism too (it used to be a bespoke special case with two hardcoded
-* beat offsets) — one less special case, same underlying idea.
+* sum of its lines' durations.
 *
-* VIDEO SCENE (new): the crown → video → Final Affirmation block adds
-* two phases. "videoTransition" ("Wait…" / "Before we continue…") is an
+* VIDEO SCENE: the crown → video → Final Affirmation block adds two
+* phases. "videoTransition" ("Wait…" / "Before we continue…") is an
 * ordinary caption-driven phase, exactly like preCrown or preHug —
 * nothing new about how it's timed. "video" is different: like
 * "questionActive", its real on-screen duration isn't a fixed number at
-* all, it's governed by an external event (the memory.mp4 `ended` event,
-* plus VideoScene's own hold/fade), so it uses the exact same "gate"
-* technique the question already uses — see `videoReleased` / gateMs
-* below. No second timeline, no second clock; it's the same mechanism
-* the question scene already proved out.
+* all, it's governed by an external event (the memory.mp4 `ended`
+* event, plus VideoScene's own hold/fade), so it uses the exact same
+* "gate" technique the question already uses — see `videoReleased` /
+* gateMs below.
 * ================================================================== */
 
 /** How long a single caption holds, purely as a function of its own
     character count — longer sentences get more time, short ones don't
-    linger. Calibrated against the examples in the brief:
-      ~25 chars  -> ~3.0s   ("This one is just for you.")
-      ~49 chars  -> ~3.9s   ("Congratulations on your postgraduate...")
-      ~104 chars -> ~6.2s   ("Seeing you manage so much...")
-      ~113 chars -> ~6.5s   ("Managing college, your studies...")
-    Clamped to a floor (so a two-word line doesn't vanish instantly) and
-    a ceiling (so nothing holds indefinitely). */
+    linger. Clamped to a floor (so a two-word line doesn't vanish
+    instantly) and a ceiling (so nothing holds indefinitely). */
 const READ_BASE_MS = 2000;
 const READ_MS_PER_CHAR = 40;
 const READ_MIN_MS = 2500;
@@ -115,10 +103,9 @@ const NAME_CARD_HOLD_MS = 3200;
 /** Every phase that's "hold a caption, then move to the next line" maps
     here — this is the single source of both the text shown during a
     phase (App.tsx's dialogueLine computation) and, via
-    buildPhaseLines()/readDuration(), how long that phase lasts. `hug` is
-    included now too (previously handled separately with hardcoded beat
-    offsets). `questionActive` and `video` are deliberately NOT in this
-    map — neither is a caption at all, they're gates (see `answered` and
+    buildPhaseLines()/readDuration(), how long that phase lasts.
+    `questionActive` and `video` are deliberately NOT in this map —
+    neither is a caption at all, they're gates (see `answered` and
     `videoReleased` below). */
 const TEXT_LINES: Partial<Record<string, string[]>> = {
   talk: DIALOGUE_LINES,
@@ -164,13 +151,8 @@ const TEXT_LINES: Partial<Record<string, string[]>> = {
 /** A floor on a phase's TOTAL duration, applied by stretching its last
     line's hold time if the natural reading-time sum falls short. Only
     crownFly needs this: its one caption is short, but the phase's
-    duration also has to cover the existing crown-fly visual (the flying
-    crown image's 1.8s transition plus its glow/sparkle) — the caption
-    text and the visual duration are two different concerns that happen
-    to share this one phase. The 4600 here is the ORIGINAL fixed value
-    this phase used before this change, kept as a minimum so the crown
-    moment can't get cut shorter than it already was, even though its
-    caption alone would only need ~4s. */
+    duration also has to cover the existing crown-fly visual (the
+    flying crown image's 1.8s transition plus its glow/sparkle). */
 const PHASE_MIN_TOTAL_MS: Partial<Record<string, number>> = { crownFly: 4600 };
 
 type LineSeg = { text: string; start: number; end: number };
@@ -282,9 +264,9 @@ const introPhaseFor = (p: Phase): IntroPhase | undefined => {
 
 type ResolvedState = { phase: Phase; lineIndex: number };
 
-/** Unchanged in spirit from before: a pure function of `elapsed`. The
-    per-line lookup now uses each phase's own (possibly non-uniform) line
-    durations via PHASE_LINES instead of dividing by a flat constant. */
+/** A pure function of `elapsed`. The per-line lookup uses each phase's
+    own (possibly non-uniform) line durations via PHASE_LINES instead of
+    dividing by a flat constant. */
 function resolveTimeline(elapsed: number): ResolvedState {
   const clamped = Math.max(0, Math.min(elapsed, TOTAL_MS));
 
@@ -315,7 +297,7 @@ const computeWalkInX = (fitVal: number, leftVisiblePx: number) => {
 };
 
 /* ================================================================== *
-* HIDDEN NAV TUNING (unchanged from before)
+* HIDDEN NAV TUNING
 * ================================================================== */
 const NAV_JUMP_MS = 5000;
 const NAV_DOUBLE_TAP_JUMP_MS = 10000;
@@ -323,53 +305,81 @@ const DOUBLE_TAP_WINDOW_MS = 450;
 const NAV_ZONE_WIDTH = "32%";
 
 /* ================================================================== *
- * VIDEO SCENE — BUNNY "HOLDING THE FRAME" TUNING (new)
+ * VIDEO SCENE — FRAME + BUNNY "HOLDING THE FRAME" TUNING
  *
- * These two constants control how the SAME bunny instance used for the
- * whole story is repositioned, purely via CSS transforms/clipping, so
- * that while `phase === "video"` it reads as standing above the memory
- * frame and gripping it with both paws, instead of standing in its
- * normal spot (or sliding off to the side, which is what this used to
- * do). No new bunny, no new arm animation — see Bunny.tsx's
- * "holdMemory" pose, which reuses the exact same arm posture already
- * used for "holdCrown".
+ * These constants control two things together, from one shared source
+ * of truth (VIDEO_FRAME_TOP_VH), so the video frame (rendered in
+ * VideoScene.tsx, sized via the frameMaxHVh/frameBottomVh props passed
+ * to it below) and the bunny's paw line (this stage, right below) are
+ * guaranteed to actually meet on screen instead of being two
+ * independently-guessed vh numbers in two different files.
  *
- * Both numbers are expressed in STAGE canvas pixels (the same 600x700
- * design-space Bunny.tsx always renders in), so — like every other
- * bunny position on this stage — they scale correctly through the
- * existing `fit` transform on any screen size.
+ * ROUND 3 — FIXED THE ACTUAL POSE, KEPT THE FRAME LARGE:
+ * the brief for this round is explicit that the frame must stay large
+ * (top edge high up the screen, like the original pre-fix version) —
+ * so the frame-size numbers below are UNCHANGED from last round.
+ * What was actually wrong was the POSE used while the (separately
+ * scaled/clipped/repositioned) bunny copy sits at that top edge:
+ * "holdMemory" copied the crown-grip's rotation numbers (56/-56,
+ * scale 1.4 — tuned for gripping one small, centered, round object)
+ * onto a much wider rectangular target, which is what produced the
+ * reported "arms stretched sideways, floating beside the frame" bug.
+ * Bunny.tsx now has a purpose-built "holdFrame" pose instead (see its
+ * VIDEO SCENE NOTE) — a more moderate raise that keeps the two paws
+ * spread toward the left/right corners of the visible clip rather than
+ * crossed over the centerline. The clip/scale/position numbers below
+ * (which only control WHERE that pose is anchored on screen, not its
+ * arm rotation) are otherwise untouched from last round.
  *
- *   VIDEO_BUNNY_CLIP_H — how much of the bunny (measured down from the
- *     top of its head, y=0 in stage space) stays visible. 520 sits
- *     comfortably below the arms/paws (shoulders are at y=408, legs
- *     start at y=548), so the held-crown-style arm pose reads fully
- *     while the legs are cropped out of frame — "only the upper/body
- *     portion" per the brief — via a plain overflow-hidden height, not
- *     a repaint of the bunny itself.
- *
- *   VIDEO_BUNNY_LIFT — how far (same canvas pixels) the bunny is moved
- *     upward from its normal standing spot so its paws land at the top
- *     of the memory frame rather than at chest height. The memory
- *     frame itself (VideoScene.tsx) is sized independently — 86vw,
- *     capped at max-w-md, vertically centered by its own flex layout —
- *     rather than through `fit`, so this is a hand-tuned, best-effort
- *     alignment rather than an exact geometric derivation. If the paws
- *     need to sit closer to or further from the frame's actual edges
- *     on a real device, this is the number to nudge.
+ * BUG FIX (kept from earlier rounds): the bunny's own canvas
+ * (STAGE_H=700) has the head/ears near the TOP and the body/legs near
+ * the BOTTOM (shoulders pivot at canvas y=408). The clip window shows
+ * a CLIP_H-tall slice starting at canvas y=0 (LIFT=0) — i.e. ears +
+ * head + the raised, paw-holding arms — and clips away everything
+ * below that, so the torso/legs can never appear in front of the
+ * frame.
  * ================================================================== */
-const VIDEO_BUNNY_CLIP_H = 520;
-const VIDEO_BUNNY_LIFT = 430;
+const VIDEO_FRAME_BOTTOM_VH = 3; // the frame's own margin from the screen's bottom edge
+const VIDEO_FRAME_TOP_VH = 78; // where the frame's top edge sits, measured from the screen bottom — single source of truth for both the frame's size (VideoScene.tsx) and the bunny's paw line below. Kept large per this round's explicit "do NOT shrink the video" instruction.
+const VIDEO_FRAME_MAX_H_VH = VIDEO_FRAME_TOP_VH - VIDEO_FRAME_BOTTOM_VH; // derived: the frame's own max-height, so its top edge lands exactly at VIDEO_FRAME_TOP_VH
+
+const VIDEO_BUNNY_CLIP_H = 430; // canvas px: ears + head + shoulders + raised paws only — cuts off right at/just past the shoulder line, before the torso/legs. Nudged up slightly (410 -> 430) from last round to comfortably keep holdFrame's more-spread paw endpoints inside the visible slice.
+const VIDEO_BUNNY_LIFT = 0; // show the natural top slice (y 0..CLIP_H) — no downward shift
+const VIDEO_BUNNY_SCALE = 0.4; // bunny is NOT enlarged to compensate for the bigger frame, per this round's explicit instruction
+
+/** BUNNY-BEHIND-FRAME FIX (this round): earlier rounds deliberately put
+    the bunny's z-index ABOVE the frame (z-45 vs the frame's z-40) and
+    let its clipped slice dip 7vh past the frame's top edge, so the
+    paws would visibly overlap ON TOP of the frame. The explicit ask
+    this round is the opposite: the bunny must sit BEHIND the frame —
+    only the head/ears/raised paws should be visible ABOVE the frame's
+    top edge, with nothing overlapping (and therefore nothing hidden by
+    or drawn over) the frame itself. So:
+      - VIDEO_BUNNY_Z is now BELOW VideoScene's frame stack (z-40),
+        not above it.
+      - VIDEO_PAW_OVERLAP_VH is 0 — the visible bunny slice now ends
+        exactly AT the frame's top edge instead of dipping into it, so
+        the paws rest right on that line and stay fully visible (a
+        negative/dipping value would now be hidden behind the frame
+        instead of drawn over it, per the new stacking order). */
+const VIDEO_BUNNY_Z = 35;
+const VIDEO_PAW_OVERLAP_VH = 0;
+const VIDEO_BUNNY_BOTTOM_VH = VIDEO_FRAME_TOP_VH - VIDEO_PAW_OVERLAP_VH; // derived: bottom of the visible bunny slice (≈ the paw line) meets the frame's top edge
 
 /* ================================================================== *
  * MUSIC SYSTEM (background.mp4 / hug.mp4)
  *
- * Reuses `muted` as the single source of truth for "is the mic/sound
- * button on" exactly as before — no second mic state, no second button,
- * mic button JSX/behavior untouched.
+ * ⚠️ VERIFIED AGAINST THE REAL PROJECT: /music/background.mp4 and
+ * /music/hug.mp4 do not currently exist in public/music/ — that folder
+ * doesn't exist yet. This whole system is written correctly and will
+ * work the moment those two audio files are added there; until then,
+ * every play() call below will simply fail (caught, logged in dev,
+ * silent in prod) and no music will be heard. See the deliverable
+ * summary for exactly what to add.
  *
- * Two real <audio> elements are still created exactly ONCE in a
- * mount-only effect and stored in refs (bgAudioRef / hugAudioRef).
- * Nothing here ever creates a second instance of either.
+ * Two real <audio> elements are created exactly ONCE in a mount-only
+ * effect and stored in refs (bgAudioRef / hugAudioRef). Nothing here
+ * ever creates a second instance of either.
  *
  * FIX 1 — INSTANT FIRST START (no fade delay) via initialStartDoneRef.
  * FIX 2 — NO-DUCK ZONE for the crown/question sequence.
@@ -381,53 +391,22 @@ const VIDEO_BUNNY_LIFT = 430;
  * FIX 6/7 — hug.mp4 gesture priming, with a re-check at resolution time
  *           so a stale prime can never pause playback that legitimately
  *           started in the meantime.
+ * FIX 8 — STICKY HUG LOCK: hugLockedRef latches to true the FIRST time
+ *         phase === "hug" is seen, and never reverts (except replay()).
+ * FIX 9 — .load() called on both tracks immediately after creation.
+ * FIX 10 — FINAL-SCREEN FADE-OUT once phase reaches "ending".
  *
- * FIX 8 — STICKY HUG LOCK:
- * `hugLockedRef` latches to true the FIRST time `phase === "hug"` is
- * seen, and never reverts (except replay()). Every decision in the
- * orchestration effect uses this sticky `hugActive` value instead of a
- * live per-render boolean, so hug.mp4 becomes and remains the permanent
- * track for the rest of the experience — it is never restarted, only
- * ducked/unducked in place, so `currentTime` carries through untouched
- * across the hug-scene boundary and every later mute/unmute.
- *
- * FIX 9 — `.load()` called on both tracks immediately after creation,
- * so buffering begins right away instead of only starting on the
- * first `.play()` — improves how reliably that first gesture-linked
- * play() actually resolves rather than rejecting on a slow mobile
- * network.
- *
- * FIX 10 — FINAL-SCREEN FADE-OUT:
- * Once `phase` reaches "ending" (the "Happy Teacher's Day, Mam!" screen
- * — the actual rendered completion state, not a page-load timer), let
- * whichever track is currently active keep playing for exactly
- * ENDING_MUSIC_HOLD_MS, then fade it to 0 and pause it. This is a
- * single new effect keyed only on `phase`, so it fires exactly once
- * per arrival at "ending" (React re-renders while phase stays "ending"
- * do not re-trigger it), and its cleanup cancels the pending fade if
- * the hidden nav ever moves `phase` away from "ending" before the
- * timer completes. It reads `hugLockedRef` — never re-derives from
- * `phase` — so it fades whichever of background.mp4 / hug.mp4 is
- * genuinely active, without switching tracks or restarting anything.
- *
- * VIDEO SCENE (rewritten): while `phase === "video"`, background/hug
- * music must be COMPLETELY SILENT — not merely ducked — because the
- * memory video plays with its own original audio, and the brief is
- * explicit that the two must never be audible at once. This is
- * different from every other "talking" phase, which only ducks music
- * down to MUSIC_VOLUME_DUCKED/HUG_DUCKED. So the orchestration effect
- * below now special-cases `phase === "video"` with its own branch: fade
- * the currently-active track down to 0 and then actually `.pause()` it
- * (never a new Audio(), never resetting `currentTime`), exactly like
- * the existing `muted` branch already does. The moment `phase` moves on
- * (VideoScene's onComplete -> `videoReleased` -> elapsed continues past
- * the video's gate into finalAffirmation), this same effect re-runs,
- * finds the track paused, and resumes THIS SAME element from wherever
- * it left off — with one small addition (`wasVideoSilencedRef`) so that
- * one specific resume fades back in smoothly instead of snapping
- * straight to the target volume, per the brief. Every other
- * paused->playing transition (initial start, unmute) is completely
- * untouched.
+ * VIDEO SCENE: while phase === "video", background/hug music must be
+ * COMPLETELY SILENT — not merely ducked — because the memory video
+ * plays with its own original audio. The orchestration effect below
+ * special-cases phase === "video": fade the currently-active track down
+ * to 0 and then actually .pause() it (never a new Audio(), never
+ * resetting currentTime). The moment the video's real `ended` event
+ * fires (VideoScene's onEnded prop, NOT a timer and NOT the later
+ * onComplete/phase change), this same effect re-runs, finds the track
+ * paused, and resumes THIS SAME element from wherever it left off —
+ * with wasVideoSilencedRef giving that one specific resume a smooth
+ * fade-in instead of snapping straight to the target volume.
  * ================================================================== */
 const MUSIC_VOLUME_FULL = 0.35;
 const MUSIC_VOLUME_HUG_FULL = 0.6; // noticeably louder/more emotional than background
@@ -470,11 +449,7 @@ function fadeAudioVolume(audio: HTMLAudioElement, token: FadeToken, target: numb
 /** FIX 5 — sets volume (and `.muted = false`, defensively) WHILE the
     element is still paused, and only then calls `.play()`, so the
     correct volume is already in effect the moment the OS actually
-    starts the audio session. The returned Promise is properly awaited
-    in try/catch: on rejection the element is simply left paused,
-    already carrying the correct volume, so the very next real tap
-    (skip / nudge / mic button / the passive first-interaction
-    listener — all of which call this same helper) retries it. */
+    starts the audio session. */
 async function activateTrack(audio: HTMLAudioElement, targetVolume: number): Promise<void> {
   audio.muted = false;
   audio.volume = targetVolume;
@@ -485,15 +460,33 @@ async function activateTrack(audio: HTMLAudioElement, targetVolume: number): Pro
     // gesture-linked call retries using this same instance.
   }
 }
+async function activateTrackWithRetry(
+  audio: HTMLAudioElement,
+  targetVolume: number,
+  attempts = 4,
+  delayMs = 350,
+): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    audio.muted = false;
+    audio.volume = targetVolume;
 
+    try {
+      await audio.play();
+      return;
+    } catch {
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+}
 /** FIX 6/7 — plays a track at volume 0 and immediately pauses it,
     purely to grant it its own per-element gesture-activation credit
     ahead of time (mobile WebKit requires this per element, not once
     per page). isStillInactive() is re-checked right before
     pause()/volume-reset — if the track has since legitimately become
-    the real active track (e.g. the timeline flipped into the hug
-    scene while this call was in flight), priming backs off instead of
-    killing genuine playback. */
+    the real active track, priming backs off instead of killing genuine
+    playback. */
 async function primeTrack(audio: HTMLAudioElement, isStillInactive: () => boolean): Promise<void> {
   const priorVolume = audio.volume;
   audio.muted = false;
@@ -521,23 +514,28 @@ export default function App() {
   const [fit, setFit] = useState(() => computeFit());
 
   /* The ONE piece of state that lives outside the timeline: whether the
-    question has been answered yet — a small interaction flag, not a
-    second clock. Everything it touches is a read-only gate on the
-    single `elapsed` value; it never stores a phase or a line index of
-    its own. */
+    question has been answered yet. */
   const [answered, setAnswered] = useState(false);
 
-  /** VIDEO SCENE gate: same idea as `answered` above, one bit of state
-      outside the timeline. Lifted by VideoScene's onComplete callback
-      once the memory has actually played out (or gracefully skipped on
-      error), which is what lets `elapsed` continue past the "video"
-      phase into finalAffirmation. */
+  /** VIDEO SCENE gate: same idea as `answered` above. Lifted by
+      VideoScene's onComplete callback once the memory has actually
+      played out (or gracefully skipped on error). */
   const [videoReleased, setVideoReleased] = useState(false);
+
+  /** VIDEO SCENE audio: set the instant the video's native `ended`
+      event fires — deliberately BEFORE the visual hold/fade beat that
+      follows it. Background music resumes on THIS signal, not on the
+      later phase change, so "video ends -> bg resumes" happens exactly
+      when the memory's own audio actually stops, per spec, rather than
+      ~2.4s later once the hold+fade have also finished playing out.
+      (Reset-on-entering-"video" effect lives further down, alongside
+      the other phase-derived effects — `phase` itself isn't declared
+      yet at this point in the component.) */
+  const [videoAudioDone, setVideoAudioDone] = useState(false);
 
   /** VIDEO SCENE: while the memory plays, have the bunny occasionally
       glance toward it and back to the viewer instead of staring at one
-      spot the whole time. Purely a `look` target swap on an interval —
-      no Bunny.tsx changes, no new pose. */
+      spot the whole time. */
   const [videoGlance, setVideoGlance] = useState<LookTarget>("right");
   useEffect(() => {
     const id = setInterval(() => {
@@ -558,8 +556,7 @@ export default function App() {
     track(evt, meta);
   };
 
-  /* MUSIC SYSTEM: the two persistent tracks + their fade tokens. See the
-     MUSIC SYSTEM comment block above for the overall design. */
+  /* MUSIC SYSTEM: the two persistent tracks + their fade tokens. */
   const bgAudioRef = useRef<HTMLAudioElement | null>(null);
   const hugAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgFadeToken = useRef(0);
@@ -568,38 +565,31 @@ export default function App() {
       has happened yet — only that one moment skips the fade-up. */
   const initialStartDoneRef = useRef(false);
   /** FIX 5: always mirrors the orchestration effect's current
-      `activeTarget`, so tryPlayActive() (called from skip/nudge/mic
-      button/the passive listener) can pass the right volume into
-      activateTrack() even though those call sites don't otherwise
-      have access to `talking`/`phase`. Starts at the normal
-      background level, matching the very first frame's true target. */
+      `activeTarget`, so tryPlayActive() can pass the right volume into
+      activateTrack() even though those call sites don't otherwise have
+      access to `talking`/`phase`. */
   const activeTargetRef = useRef(MUSIC_VOLUME_FULL);
   /** FIX 8: once the hug scene is ever reached, this latches to true
-      and never resets (except replay()). Both the orchestration
-      effect and isHugSceneRef below key off THIS, not the live
-      `phase` — so background.mp4 can never become active again after
-      the hug scene has happened. */
+      and never resets (except replay()). */
   const hugLockedRef = useRef(false);
   /** VIDEO SCENE: true only while `phase === "video"`, kept in sync by
-      a tiny dedicated effect below. Read by tryPlayActive() so that a
-      gesture during the memory (a screen tap, the mic button, hidden
-      nav) can never resume background/hug music out from under the
-      video's own audio — that resuming is intentionally deferred to
-      the orchestration effect below, which only does it once `phase`
-      has actually moved on. */
+      a tiny dedicated effect below. */
   const videoActiveRef = useRef(false);
+  /** VIDEO SCENE: imperative handle onto the (now permanently mounted)
+      VideoScene component — used to (a) silently prime the <video>
+      element's gesture-based audio permission on every existing
+      gesture, exactly like the bg/hug <audio> priming below, (b) let
+      the existing tap-to-advance/"skip" handler pause/resume the
+      actual video when tapping the middle of the screen, and (c) reset
+      the memory to its start on replay(). */
+  const videoSceneRef = useRef<VideoSceneHandle>(null);
   /** VIDEO SCENE: set the instant background/hug music gets silenced
-      for the memory video, and cleared the instant it resumes —
-      see the orchestration effect below. Lets that effect give this
-      one specific paused->playing transition a smooth fade-in instead
-      of the instant volume-then-play every other transition uses. */
+      for the memory video, and cleared the instant it resumes. */
   const wasVideoSilencedRef = useRef(false);
 
   /* Always-current mirrors of `muted` / "is the hug scene active", read
      by the gesture-linked play attempts (FIX 3) so they never act on a
-     stale value captured at mount time. isHugSceneRef now mirrors the
-     STICKY hugLockedRef (kept in sync inside the orchestration effect
-     below), not a live phase comparison. */
+     stale value captured at mount time. */
   const mutedRef = useRef(muted);
   useEffect(() => {
     mutedRef.current = muted;
@@ -647,25 +637,22 @@ export default function App() {
   }, []);
 
   /** FIX 3: the shared "try to start/resume the correct track right
-      now" attempt. Reads the current scene from isHugSceneRef (kept
-      in sync with the STICKY hugLockedRef), never a timer. Safe to
-      call as often as needed. Called both from a passive page-wide
-      listener (below) and synchronously from the app's existing
-      click handlers (skip / nudge / mic button).
-
-      FIX 6/7: also silently primes whichever track is NOT currently
-      active, so its own first-ever .play() (triggered automatically
-      later, when the timeline flips `phase` into that scene) already
-      has the gesture credit it needs — and re-checks before pausing
-      so it can never kill playback that started legitimately in the
-      meantime.
+      now" attempt. Safe to call as often as needed. Called both from a
+      passive page-wide listener (below) and synchronously from the
+      app's existing click handlers (skip / nudge / mic button).
 
       VIDEO SCENE: bails out immediately if the memory video is
       currently on screen — a gesture during the video must never
-      resume background/hug music; that music intentionally stays
-      silent (and paused) for the whole video, per the brief, and only
-      the orchestration effect resumes it once `phase` moves on. */
+      resume background/hug music. */
   const tryPlayActive = () => {
+    // VIDEO SCENE: silently prime the memory <video> element's audio
+    // permission on every gesture that already reaches this function
+    // (clicks, taps, keydowns — see the passive listener below) so
+    // that by the time `phase === "video"` actually arrives, the
+    // browser has already granted this exact element gesture-based
+    // playback history and unmuted playback works with no extra
+    // button. Safe to call every time — it's a no-op once primed.
+    videoSceneRef.current?.prime();
     if (mutedRef.current) return;
     if (videoActiveRef.current) return;
     const active = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
@@ -676,8 +663,6 @@ export default function App() {
     if (inactive && inactive.paused) {
       const primedTrack = inactive;
       void primeTrack(primedTrack, () => {
-        // Re-evaluated at resolution time, not call time — this is what
-        // catches the scene having switched in between.
         const nowActive = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
         return nowActive !== primedTrack;
       });
@@ -694,16 +679,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* How far forward `elapsed` is currently allowed to go.
-     Unanswered: capped just short of the end of the question segment,
-     so autoplay stalls there and the phase stays resolved as
-     "questionActive" for as long as it takes to answer.
-     Answered but the video hasn't finished/released yet: capped just
-     short of the end of the video segment, same technique, second gate.
-     Both resolved: no cap at all.
-     The two gates are sequential in time (question segment comes before
-     the video segment), so this simple if/else chain is sufficient —
-     there's never a need to take a min() across both at once. */
+  /* How far forward `elapsed` is currently allowed to go. */
   const gateMs = !answered
     ? Math.max(QUESTION_SEGMENT.start, QUESTION_SEGMENT.end - 1)
     : !videoReleased
@@ -714,7 +690,7 @@ export default function App() {
     gateRef.current = gateMs;
   }, [gateMs]);
 
-  /* The ONE clock, unchanged in mechanism from before. */
+  /* The ONE clock. */
   useEffect(() => {
     let raf: number;
     let last = performance.now();
@@ -732,10 +708,12 @@ export default function App() {
   const { phase, lineIndex } = useMemo(() => resolveTimeline(elapsed), [elapsed]);
 
   /* VIDEO SCENE: keep videoActiveRef in sync with the resolved phase,
-     so tryPlayActive() (called from gesture handlers) always sees a
-     fresh value instead of one captured at mount time. */
+     and reset videoAudioDone the moment "video" is (re-)entered — e.g.
+     via the hidden nav — so a stale `true` from a previous pass can't
+     skip the silence branch on next entry. */
   useEffect(() => {
     videoActiveRef.current = phase === "video";
+    if (phase === "video") setVideoAudioDone(false);
   }, [phase]);
 
   /* page_opened fires once, on mount. */
@@ -746,9 +724,7 @@ export default function App() {
 
   /* Every scene-progress event fires once, the first time its phase is
     reached — guarded by trackOnce() so re-visiting a phase via the
-    hidden nav never spams duplicate rows. Each is a separate INSERT
-    (see analytics.ts), and none of them are ever touched again once
-    written, including when "completed" is added at the end. */
+    hidden nav never spams duplicate rows. */
   useEffect(() => {
     if (phase === "introGreeting") trackOnce("hi_shown", "hi_shown");
     if (phase === "questionActive") trackOnce("question_shown", "question_shown");
@@ -762,10 +738,7 @@ export default function App() {
   const isIntro = (INTRO_PHASES as readonly string[]).includes(phase);
 
   /** VIDEO SCENE: bunny slides slightly aside once the memory itself is
-      on screen (not during the "Wait…" lines — she says those facing
-      the viewer, then hops aside as the video fades in), so it reads as
-      her proudly showing it rather than blocking it. Pure positional
-      offset on the existing render tree; Bunny.tsx itself is untouched. */
+      on screen. */
   const isVideoScene = phase === "video";
 
   const pose: BunnyPose = useMemo(() => {
@@ -774,8 +747,6 @@ export default function App() {
       case "introPeek":
       case "introWave":
       case "introGreeting":
-        // unused while introPhaseFor(phase) is set — Bunny renders the
-        // dedicated intro rig instead, ignoring pose entirely.
         return "idle";
       case "introEnter":
         return "walkIn";
@@ -784,8 +755,6 @@ export default function App() {
       case "questionSetup":
         return "talk";
       case "questionActive":
-        // "Leaning on the question card" — see Bunny.tsx's new "lean"
-        // pose (mirrored, both-arms-forward).
         return "lean";
       case "yesAffirm":
       case "teacherImpact":
@@ -808,15 +777,13 @@ export default function App() {
       case "crownFly":
         return "raise";
       case "videoTransition":
-        // "suddenly remembers something" and tells the viewer about it.
         return "talk";
       case "video":
-        // VIDEO SCENE: "holding the memory frame with both paws" —
-        // reuses the existing holdCrown arm posture (see Bunny.tsx's
-        // "holdMemory" pose). Positioning above the frame, and the fact
-        // that no crown image renders for this pose, are handled below
-        // via the bunny wrapper, not by Bunny.tsx itself.
-        return "holdMemory";
+        // ROUND 3: was "holdMemory" (removed from Bunny.tsx — see its
+        // VIDEO SCENE NOTE). Now uses the purpose-built "holdFrame"
+        // pose, tuned for the wide/tall video frame rather than the
+        // crown's small-object grip.
+        return "holdFrame";
       case "approach":
         return "approach";
       case "hug":
@@ -871,26 +838,7 @@ export default function App() {
     phase,
   );
 
-  /* MUSIC SYSTEM: the one orchestration effect. Recomputes whenever
-     `muted`, `phase`, or `talking` changes — each recomputation is
-     idempotent (it just re-targets the existing two Audio instances),
-     so it's safe to run as often as those values change.
-
-     FIX 8: `hugActive` is derived from the STICKY `hugLockedRef`, not
-     a live `phase === "hug"` comparison — the lock is set the first
-     time phase reaches "hug" and never cleared (except replay()), so
-     hug.mp4 remains the active track for every scene afterward.
-
-     VIDEO SCENE (rewritten): `phase === "video"` is now its own branch,
-     checked right after the existing `muted` branch and before the
-     normal ducking logic — it fades the currently-active track to 0 and
-     actually pauses BOTH tracks (never a new Audio(), never resetting
-     currentTime), exactly mirroring how the `muted` branch already
-     silences things, and marks `wasVideoSilencedRef` so the resume that
-     follows can fade in smoothly. Once `phase` moves off "video", this
-     effect re-runs, falls through to the normal logic below, finds the
-     active track paused, and resumes it — with a smooth fade this one
-     time instead of the usual instant volume-then-play. */
+  /* MUSIC SYSTEM: the one orchestration effect. */
   useEffect(() => {
     const bg = bgAudioRef.current;
     const hug = hugAudioRef.current;
@@ -920,8 +868,12 @@ export default function App() {
     // VIDEO SCENE: complete silence — not a duck — while the memory's
     // own audio plays. Fade both tracks to 0 and pause them, same
     // mechanism as the `muted` branch above, so nothing is ever
-    // audible at the same time as the video.
-    if (phase === "video") {
+    // audible at the same time as the video. Gated on !videoAudioDone
+    // so this stops applying the instant the video's `ended` event
+    // fires (see VideoScene's onEnded prop below) — not later, once
+    // the visual hold/fade has also finished — matching the exact
+    // "video ends -> bg resumes" sequencing from the brief.
+    if (phase === "video" && !videoAudioDone) {
       activeTargetRef.current = 0;
       wasVideoSilencedRef.current = true;
       fadeAudioVolume(active, activeToken, 0, MUSIC_MUTE_FADE_MS);
@@ -948,12 +900,6 @@ export default function App() {
     activeTargetRef.current = activeTarget;
 
     if (active.paused) {
-      // FIX 5: transitioning paused -> playing. activateTrack() sets
-      // volume BEFORE calling play() and properly awaits/handles the
-      // Promise. Reachable on mount, on unmute, on the hug scene's
-      // first activation, or on a scene/talking change while already
-      // unmuted; on rejection the element stays paused at the correct
-      // volume, and FIX 3's gesture-linked calls retry it.
       initialStartDoneRef.current = true;
       if (wasVideoSilencedRef.current) {
         // VIDEO SCENE: this is specifically the resume right after the
@@ -965,18 +911,12 @@ export default function App() {
           fadeAudioVolume(active, activeToken, activeTarget, MUSIC_FADE_MS);
         });
       } else {
-        void activateTrack(active, activeTarget);
+        void activateTrackWithRetry(active, activeTarget);
       }
     } else if (!initialStartDoneRef.current) {
-      // Already playing somehow before the "first activation" flag was
-      // set (defensive edge case) — just align the flag, no fade.
       initialStartDoneRef.current = true;
       active.volume = activeTarget;
     } else {
-      // Already playing: e.g. hug.mp4 continuing on into every scene
-      // after the hug, just ducking/unducking for talking — never
-      // restarted, never reset to the beginning; currentTime carries
-      // through untouched.
       fadeAudioVolume(active, activeToken, activeTarget, MUSIC_FADE_MS);
     }
     fadeAudioVolume(inactive, inactiveToken, 0, MUSIC_FADE_MS);
@@ -985,20 +925,9 @@ export default function App() {
       if (inactive.volume <= 0.001) inactive.pause();
     }, MUSIC_FADE_MS + 50);
     return () => window.clearTimeout(pauseTimer);
-  }, [muted, phase, talking]);
+  }, [muted, phase, talking, videoAudioDone]);
 
-  /** FIX 10 — FINAL-SCREEN FADE-OUT.
-      Fires only when `phase` transitions to "ending" (the actual
-      rendered completion screen). Waits ENDING_MUSIC_HOLD_MS, then
-      fades whichever track is genuinely active (read from the same
-      sticky hugLockedRef the orchestration effect above uses, never
-      re-derived from `phase`) down to 0 and pauses it. Doesn't touch
-      mute state, doesn't restart or switch tracks, doesn't run again
-      on later re-renders while phase stays "ending" (the effect only
-      re-runs when `phase` itself changes), and its cleanup clears the
-      pending timeout if the hidden nav moves away from "ending"
-      before the 3s elapse — so the fade can never fire late into the
-      wrong scene. */
+  /** FIX 10 — FINAL-SCREEN FADE-OUT. */
   useEffect(() => {
     if (phase !== "ending") return;
 
@@ -1017,19 +946,20 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [phase]);
 
-  /* Tap-to-advance in the CENTER of the screen — jumps `elapsed` to the
-    start of the next line (using that line's own end time, not a flat
-    constant), which naturally rolls into the next phase once the
-    current one's lines run out. Clamped to the same gate the clock
-    itself respects, so tapping can't skip past an unanswered question
-    (or, now, an unfinished video) either. Phases with no PHASE_LINES
-    entry (questionActive, video) simply have no `pl`, so this is a
-    no-op for them — a screen tap can't skip the memory, exactly like
-    it already can't skip the question. */
+  /* Tap-to-advance in the CENTER of the screen. */
   const skip = () => {
-    // FIX 3: a real click handler is one of the most reliable places
-    // for the browser to honor a play() call — piggyback on it.
     tryPlayActive();
+    // VIDEO SCENE: clicking the middle/main content area while the
+    // memory is on screen pauses/resumes the actual <video> element
+    // instead of advancing the timeline (there's nothing to "skip" to
+    // anyway — this phase is gated on the video itself, see
+    // `videoReleased`/VIDEO_SEGMENT). Left/right nav zones and other
+    // buttons render above this at their own z-index with their own
+    // onClick + stopPropagation, so they're unaffected.
+    if (phase === "video") {
+      videoSceneRef.current?.togglePauseResume();
+      return;
+    }
     if (isIntro) {
       setElapsed(TIMELINE.find((s) => s.phase === "introEnter")!.start);
       return;
@@ -1050,21 +980,18 @@ export default function App() {
     setElapsed(0);
     setAnswered(false);
     setVideoReleased(false);
+    setVideoAudioDone(false);
     lastTapRef.current = { side: null, time: 0 };
     trackedRef.current = new Set();
     initialStartDoneRef.current = false;
     hugLockedRef.current = false; // FIX 8: un-latch for the new run
     wasVideoSilencedRef.current = false; // VIDEO SCENE: reset for the new run
+    videoSceneRef.current?.reset(); // VIDEO SCENE: rewind the memory itself for the new run
     setRunId((r) => r + 1);
     track("page_opened");
   };
 
-  /* ---- HIDDEN TIMELINE NAVIGATION ---- (unchanged mechanism from
-    before — clamp is `gateMs`, so forward-nav can't skip past an
-    unanswered question, or an unfinished video, any more than autoplay
-    can.) */
   const nudge = (direction: -1 | 1) => {
-    // FIX 3: same reasoning as skip() above.
     tryPlayActive();
     const side = direction === -1 ? "left" : "right";
     const now = performance.now();
@@ -1080,13 +1007,6 @@ export default function App() {
     track("yes_clicked");
   };
 
-  /* FIX 4: this used to also spin up four independent Web Audio
-     oscillators as a synthesized "hum," entirely separate from
-     background.mp4/hug.mp4 and capable of layering on top of them.
-     That's removed — the mic button now purely toggles `muted`, which
-     already drives both real tracks via the orchestration effect
-     above. Button design, icon, aria-label, and click wiring below are
-     unchanged. */
   const toggleSound = () => {
     tryPlayActive();
     setMuted((m) => !m);
@@ -1099,11 +1019,7 @@ export default function App() {
     phase === "introGreeting" || phase === "introEnter"
       ? DIALOGUE_LINES[0]!
       : phase === "questionActive"
-        ? // While unanswered, <QuestionCard> below owns the question
-        // text (so it isn't shown twice). Once answered, revisiting
-        // this moment via the hidden nav shows it as a plain caption
-        // like any other narrative beat.
-        answered
+        ? answered
           ? QUESTION_TEXT
           : null
         : isNameCard
@@ -1145,46 +1061,47 @@ export default function App() {
         </div>
       ) : (
         <div
-          className="absolute bottom-0 left-1/2"
+          className="absolute left-1/2"
           style={{
             width: STAGE_W,
-            height: STAGE_H,
+            // VIDEO SCENE: the wrapper's own height is the visible
+            // CLIP_H slice itself (not the full STAGE_H) — that way
+            // there's no leftover empty box-space below the slice
+            // silently pushing the whole thing (and the head) higher
+            // up the screen than intended. This is the ONLY Bunny
+            // instance rendered in the video scene — the body isn't a
+            // second layer sitting "behind" the frame, it's simply
+            // never drawn: `overflow: hidden` on the inner wrapper
+            // below clips the bunny's own canvas to just the top
+            // CLIP_H slice (ears + head + raised paws), so nothing
+            // below the shoulder line exists in the DOM at all while
+            // this scene is active.
+            height: isVideoScene ? VIDEO_BUNNY_CLIP_H : STAGE_H,
             marginLeft: -STAGE_W / 2,
-            transform: `scale(${fit})`,
+            // VIDEO SCENE: pinned to a taller "bottom" (the tuned paw
+            // line) instead of the screen's actual bottom edge.
+            bottom: isVideoScene ? `${VIDEO_BUNNY_BOTTOM_VH}vh` : 0,
+            transform: `scale(${isVideoScene ? fit * VIDEO_BUNNY_SCALE : fit})`,
             transformOrigin: "50% 100%",
-            // VIDEO SCENE: while the memory plays, the bunny must render
-            // above the video frame (VideoScene.tsx is z-40) instead of
-            // its normal z-20 — see the "Z-INDEX / LAYERING" tuning
-            // block near the top of this file. Every other phase keeps
-            // the exact same z-20 stacking as before.
-            zIndex: isVideoScene ? 45 : 20,
-            // VIDEO SCENE: this wrapper's own box spans the bunny's full
-            // (unclipped) STAGE_H, which — now that it's lifted above
-            // the frame and re-stacked above it — would otherwise sit
-            // on top of, and intercept clicks meant for, VideoScene's
-            // "tap for sound" affordance. The bunny's own artwork is
-            // already pointer-events-none (see Slot/Img in Bunny.tsx),
-            // so nothing about how it's drawn needs to change; the
-            // wrapper simply stops being a hit target itself.
+            // VIDEO SCENE: this single clipped/repositioned copy of the
+            // bunny must draw BEHIND the video frame (VideoScene is
+            // z-40) — only its head/ears/raised paws poke up above the
+            // frame's top edge (see VIDEO_PAW_OVERLAP_VH, now 0), so
+            // nothing needs to render in front of the frame itself.
+            zIndex: isVideoScene ? VIDEO_BUNNY_Z : 20,
             pointerEvents: isVideoScene ? "none" : undefined,
+            transition:
+              "bottom 1.1s cubic-bezier(0.22,1,0.36,1), height 1.1s cubic-bezier(0.22,1,0.36,1), transform 1.1s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
           <div
             className="w-full"
             style={
               isVideoScene
-                ? { height: VIDEO_BUNNY_CLIP_H, overflow: "hidden" }
+                ? { height: "100%", overflow: "hidden" }
                 : { height: "100%" }
             }
           >
-            {/* VIDEO SCENE: the same bunny instance is lifted straight
-                up (instead of sliding aside) so it appears above the
-                memory frame, both paws gripping its top corners — see
-                Bunny.tsx's "holdMemory" pose for the arm posture, and
-                the VIDEO_BUNNY_LIFT/VIDEO_BUNNY_CLIP_H tuning block
-                above for how far up and how much of the bunny shows.
-                Bunny.tsx itself, its pose/look props aside, is
-                untouched. */}
             <motion.div
               animate={isVideoScene ? { x: 0, y: -VIDEO_BUNNY_LIFT } : { x: 0, y: 0 }}
               transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
@@ -1202,6 +1119,7 @@ export default function App() {
           </div>
         </div>
       )}
+
 
       <AnimatePresence>
         {phase === "hug" && (
@@ -1249,20 +1167,22 @@ export default function App() {
       </AnimatePresence>
       <CrownGlow active={phase === "crownFly"} />
 
-      {/* VIDEO SCENE: the cinematic memory reveal. Mounted only while
-            phase === "video" — see VideoScene.tsx for the dim/particles/
-            glowing-frame treatment, autoplay/mute handling, and the
-            graceful skip-on-error fallback. onComplete lifts the
-            `videoReleased` gate, which is the only thing that lets the
-            timeline continue on into Final Affirmation. */}
-      <AnimatePresence>
-        {phase === "video" && <VideoScene key="video-scene" onComplete={() => setVideoReleased(true)} />}
-      </AnimatePresence>
+      {/* VIDEO SCENE: now ALWAYS mounted (not conditionally added/
+          removed via AnimatePresence) — see VideoScene.tsx's top-of-
+          file note for why this is the actual fix for the video's
+          audio being silent. Visibility/interactivity are entirely
+          driven by the `active` prop; there is no visible or
+          interactive trace of this component while `active` is
+          false. */}
+      <VideoScene
+        ref={videoSceneRef}
+        active={phase === "video"}
+        frameMaxHVh={VIDEO_FRAME_MAX_H_VH}
+        frameBottomVh={VIDEO_FRAME_BOTTOM_VH}
+        onEnded={() => setVideoAudioDone(true)}
+        onComplete={() => setVideoReleased(true)}
+      />
 
-      {/* The one special-cased visual beat: "Dr. [Name]" gets a centered
-            reveal card instead of the usual bottom caption. Everything
-            about *when* it appears still comes from the timeline — this is
-            purely a different renderer for one specific line. */}
       <AnimatePresence>
         {isNameCard && (
           <motion.div
@@ -1282,8 +1202,6 @@ export default function App() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[26vh] bg-subtitle-scrim" />
       <Dialogue line={dialogueLine} tone={phase === "crownFly" ? "gold" : "soft"} />
 
-      {/* The one deliberately non-linear scene: mounted only while the
-            question is live and unanswered. See QuestionCard.tsx. */}
       <AnimatePresence>
         {phase === "questionActive" && !answered && (
           <QuestionCard
@@ -1321,7 +1239,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* ---- HIDDEN TIMELINE NAV ZONES ---- (unchanged from before) */}
       <div
         onClick={(e) => {
           e.stopPropagation();

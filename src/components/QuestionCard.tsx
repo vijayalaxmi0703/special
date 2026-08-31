@@ -55,9 +55,20 @@ const FINAL_ESCAPE_MULTIPLIER = 1.6;
 const FINAL_ESCAPE_DELAY_MS = 420;
 
 /** Tune these if the card still overlaps the bunny's face, or the hands
-    end up hidden behind it, once you see it rendered. */
-const CARD_MAX_HEIGHT_VH = 34;
-const CARD_BOTTOM_VH = 3;
+    end up hidden behind it, once you see it rendered.
+    Both constants are exported. VideoScene.tsx imports CARD_BOTTOM_VH so
+    the memory frame is bottom-anchored at this exact same distance from
+    the bottom of the screen, giving it the same relative position to the
+    bunny that QuestionCard already has — see App.tsx's "VIDEO SCENE —
+    POSITIONING" comment for the full reasoning. It now ALSO imports
+    CARD_MAX_HEIGHT_VH, so the frame is capped at the exact same height
+    envelope as this card, not just bottom-anchored the same way — the
+    bunny's "lean" arm pose was tuned to grip THIS card's actual size, so
+    reusing both numbers (not just the bottom offset) is what makes that
+    same, unmodified pose actually reach a wider/taller video frame too.
+    See VideoScene.tsx's top-of-file note for the full reasoning. */
+export const CARD_MAX_HEIGHT_VH = 34;
+export const CARD_BOTTOM_VH = 3;
 
 /* Translucent dark-purple "glass" card with soft pink/gold glow, so it
    reads as part of the same night-sky/magical environment as the rest
