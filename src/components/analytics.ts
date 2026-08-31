@@ -16,6 +16,7 @@ export type AnalyticsEvent =
   | "yes_clicked"
   | "dr_scene"
   | "crown_scene"
+  | "video_scene"
   | "hug_scene"
   | "completed";
 

@@ -19,6 +19,17 @@
  * three frames at module load (guarded for SSR), so every device has
  * them decoded and cached well before the bunny ever starts talking —
  * nothing about the animation mechanism itself changed.
+ *
+ * VIDEO SCENE NOTE (new): added a "holdMemory" pose so the bunny can
+ * appear to be holding the memory-video frame with both paws. This is
+ * NOT a new bunny, NOT a new arm animation, and NOT a new asset — it
+ * deliberately reuses the exact same both-arms-bent-and-raised posture
+ * already used for "holdCrown" (rotate 56 / -56, scale 1.4). The only
+ * change is that `isHold` below now also matches "holdMemory", so that
+ * existing arm math applies to it too. Positioning the bunny above the
+ * memory frame, and not rendering a held-crown image for this pose, is
+ * handled entirely in App.tsx — this file's actual rendering logic for
+ * the arms/body/head is untouched.
  */
 import { AnimatePresence, motion, type Transition } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -43,7 +54,11 @@ export type BunnyPose =
   | "hug"
   | "release"
   | "wave"
-  | "sit";
+  | "sit"
+  // VIDEO SCENE: both paws gripping the memory frame's top corners.
+  // Deliberately reuses holdCrown's arm math (see isHold below) rather
+  // than introducing any new animation values.
+  | "holdMemory";
 
 export type LookTarget = "viewer" | "crown" | "shy" | "up" | "down" | "left" | "right" | "away";
 
@@ -318,7 +333,12 @@ export default function Bunny({
   const isHug = pose === "hug";
   const isApproach = pose === "approach";
   const isRaise = pose === "raise";
-  const isHold = pose === "holdCrown";
+  // VIDEO SCENE: "holdMemory" intentionally shares isHold with
+  // "holdCrown" — same arm rotate/scale values below, same spring
+  // transition, no new animation branch. Only App.tsx's positioning of
+  // the whole bunny, and the fact that holdingCrown stays false for
+  // this pose (so no crown image renders), differ.
+  const isHold = pose === "holdCrown" || pose === "holdMemory";
   const isLean = pose === "lean";
 
   const rootAnim = (() => {
@@ -341,6 +361,12 @@ export default function Bunny({
         return { x: 0, y: 8, scale: 1.15, rotate: 0, opacity: 1 };
       case "sit":
         return { x: 0, y: 30, scale: 0.88, rotate: 0, opacity: 1 };
+      // VIDEO SCENE: deliberately NOT special-cased here — "holdMemory"
+      // falls through to the same neutral default as every other
+      // unlisted pose (x:0, y:0, scale:1). App.tsx positions the whole
+      // bunny above the memory frame externally, via its own wrapper
+      // transform, rather than baking a video-scene-specific offset
+      // into this shared root-animation table.
       default:
         return { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
     }
@@ -382,6 +408,8 @@ export default function Bunny({
     if (isHug) return { rotate: [2, 22, 44, 64] as number[], scale: [1, 1.05, 1.09, 1.11] as number[] };
     if (isApproach) return { rotate: [-6, -30, -58] as number[], scale: 1 };
     if (isRaise) return { rotate: 100, scale: 1.04 };
+    // isHold covers both "holdCrown" and "holdMemory" — identical arm
+    // posture reused for the memory-frame pose, per the brief.
     if (isHold) return { rotate: 56, scale: 1.4 };
     if (isLean) return { rotate: 62, scale: 1 };
     if (pose === "wave") return { rotate: [120, 152, 120] as number[], scale: 1 };
