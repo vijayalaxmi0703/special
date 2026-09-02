@@ -1,11 +1,11 @@
-import { useEffect } from "react";
-import { HeadContent, Link, Outlet, Scripts, createFileRoute, createRootRouteWithContext, createRouter, lazyRouteComponent, useRouter } from "@tanstack/react-router";
-import { jsx, jsxs } from "react/jsx-runtime";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-//#region src/styles.css?url
-var styles_default = "/assets/styles-C58Vca2F.css";
-//#endregion
-//#region src/lib/lovable-error-reporting.ts
+import { n as __toESM } from "../_runtime.mjs";
+import { n as require_jsx_runtime, r as require_react, t as QueryClientProvider } from "../_libs/react+tanstack__react-query.mjs";
+import { c as HeadContent, d as Outlet, f as lazyRouteComponent, g as useRouter, h as Link, m as createRootRouteWithContext, p as createFileRoute, s as Scripts, u as createRouter } from "../_libs/@tanstack/react-router+[...].mjs";
+import { t as QueryClient } from "../_libs/tanstack__query-core.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/router-DYKYakDH.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var styles_default = "/assets/styles-DxCbyhQC.css";
 function reportLovableError(error, context = {}) {
 	if (typeof window === "undefined") return;
 	window.__lovableEvents?.captureException?.(error, {
@@ -25,29 +25,27 @@ function reportLovableError(error, context = {}) {
 		filename: window.location.pathname
 	});
 }
-//#endregion
-//#region src/routes/__root.tsx
 function NotFoundComponent() {
-	return /* @__PURE__ */ jsx("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "flex min-h-screen items-center justify-center bg-background px-4",
-		children: /* @__PURE__ */ jsxs("div", {
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "max-w-md text-center",
 			children: [
-				/* @__PURE__ */ jsx("h1", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
 					className: "text-7xl font-bold text-foreground",
 					children: "404"
 				}),
-				/* @__PURE__ */ jsx("h2", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
 					className: "mt-4 text-xl font-semibold text-foreground",
 					children: "Page not found"
 				}),
-				/* @__PURE__ */ jsx("p", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 					className: "mt-2 text-sm text-muted-foreground",
 					children: "The page you're looking for doesn't exist or has been moved."
 				}),
-				/* @__PURE__ */ jsx("div", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 					className: "mt-6",
-					children: /* @__PURE__ */ jsx(Link, {
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
 						to: "/",
 						className: "inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90",
 						children: "Go home"
@@ -60,34 +58,34 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }) {
 	console.error(error);
 	const router = useRouter();
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		reportLovableError(error, { boundary: "tanstack_root_error_component" });
 	}, [error]);
-	return /* @__PURE__ */ jsx("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "flex min-h-screen items-center justify-center bg-background px-4",
-		children: /* @__PURE__ */ jsxs("div", {
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "max-w-md text-center",
 			children: [
-				/* @__PURE__ */ jsx("h1", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
 					className: "text-xl font-semibold tracking-tight text-foreground",
 					children: "This page didn't load"
 				}),
-				/* @__PURE__ */ jsx("p", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 					className: "mt-2 text-sm text-muted-foreground",
 					children: "Something went wrong on our end. You can try refreshing or head back home."
 				}),
-				/* @__PURE__ */ jsxs("div", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "mt-6 flex flex-wrap justify-center gap-2",
-					children: [/* @__PURE__ */ jsx("button", {
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 						onClick: () => {
 							router.invalidate();
 							reset();
 						},
 						className: "inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90",
 						children: "Try again"
-					}), /* @__PURE__ */ jsx("a", {
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
 						href: "/",
-						className: "inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground",
+						className: "inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent",
 						children: "Go home"
 					})]
 				})
@@ -103,18 +101,18 @@ var Route$1 = createRootRouteWithContext()({
 				name: "viewport",
 				content: "width=device-width, initial-scale=1"
 			},
-			{ title: "A Special Teacher's Day Surprise ❤️" },
+			{ title: "Happy Teacher's Day" },
 			{
 				name: "description",
-				content: "A special Teacher's Day surprise made with love. ❤️"
+				content: "A little Teacher's Day surprise."
 			},
 			{
 				property: "og:title",
-				content: "A Special Teacher's Day Surprise ❤️"
+				content: "Happy Teacher's Day"
 			},
 			{
 				property: "og:description",
-				content: "A special Teacher's Day surprise made with love. ❤️"
+				content: "A little Teacher's Day surprise."
 			},
 			{
 				property: "og:type",
@@ -151,23 +149,19 @@ var Route$1 = createRootRouteWithContext()({
 	errorComponent: ErrorComponent
 });
 function RootShell({ children }) {
-	return /* @__PURE__ */ jsxs("html", {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("html", {
 		lang: "en",
-		children: [/* @__PURE__ */ jsx("head", { children: /* @__PURE__ */ jsx(HeadContent, {}) }), /* @__PURE__ */ jsxs("body", { children: [children, /* @__PURE__ */ jsx(Scripts, {})] })]
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("head", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(HeadContent, {}) }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("body", { children: [children, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Scripts, {})] })]
 	});
 }
 function RootComponent() {
 	const { queryClient } = Route$1.useRouteContext();
-	return /* @__PURE__ */ jsx(QueryClientProvider, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueryClientProvider, {
 		client: queryClient,
-		children: /* @__PURE__ */ jsx(Outlet, {})
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Outlet, {})
 	});
 }
-//#endregion
-//#region src/routes/index.tsx
-var $$splitComponentImporter = () => import("./routes-CW3bzCAk.js");
-//#endregion
-//#region src/routeTree.gen.ts
+var $$splitComponentImporter = () => import("./routes-Cs5gQCQd.mjs");
 var rootRouteChildren = { IndexRoute: createFileRoute("/")({
 	head: () => ({ meta: [
 		{ title: "For Sirisha Mam — A Teacher's Day Film" },
@@ -199,8 +193,6 @@ var rootRouteChildren = { IndexRoute: createFileRoute("/")({
 	getParentRoute: () => Route$1
 }) };
 var routeTree = Route$1._addFileChildren(rootRouteChildren)._addFileTypes();
-//#endregion
-//#region src/router.tsx
 var getRouter = () => {
 	const queryClient = new QueryClient();
 	return createRouter({

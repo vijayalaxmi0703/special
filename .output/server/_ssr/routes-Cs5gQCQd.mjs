@@ -3,7 +3,7 @@ import { n as AnimatePresence, r as performance_default, t as motion } from "../
 import { n as require_jsx_runtime, r as require_react } from "../_libs/react+tanstack__react-query.mjs";
 import { n as Volume2, r as RotateCcw, t as VolumeX } from "../_libs/lucide-react.mjs";
 import { t as createClient } from "../_libs/supabase__supabase-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-CW3bzCAk.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-Cs5gQCQd.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var P = {
@@ -2356,7 +2356,6 @@ function App() {
 	const activeTargetRef = (0, import_react.useRef)(MUSIC_VOLUME_FULL);
 	/** FIX 8: once the hug scene is ever reached, this latches to true
 	and never resets (except replay()). */
-	const hugLockedRef = (0, import_react.useRef)(false);
 	/** VIDEO SCENE: true only while `phase === "video"`, kept in sync by
 	a tiny dedicated effect below. */
 	const videoActiveRef = (0, import_react.useRef)(false);
@@ -2557,8 +2556,7 @@ function App() {
 		const bg = bgAudioRef.current;
 		const hug = hugAudioRef.current;
 		if (!bg || !hug) return;
-		if (phase === "hug") hugLockedRef.current = true;
-		const hugActive = hugLockedRef.current;
+		const hugActive = phase === "hug";
 		isHugSceneRef.current = hugActive;
 		const active = hugActive ? hug : bg;
 		const inactive = hugActive ? bg : hug;
@@ -2585,7 +2583,7 @@ function App() {
 			return () => window.clearTimeout(pauseTimer);
 		}
 		const inCrownSequence = CROWN_SEQUENCE_PHASES.has(phase);
-		const activeTarget = talking && !inCrownSequence ? hugActive ? MUSIC_VOLUME_HUG_DUCKED : MUSIC_VOLUME_DUCKED : hugActive ? MUSIC_VOLUME_HUG_FULL : MUSIC_VOLUME_FULL;
+		const activeTarget = talking && !inCrownSequence && !hugActive ? hugActive ? MUSIC_VOLUME_HUG_DUCKED : MUSIC_VOLUME_DUCKED : hugActive ? MUSIC_VOLUME_HUG_FULL : MUSIC_VOLUME_FULL;
 		activeTargetRef.current = activeTarget;
 		if (active.paused) {
 			initialStartDoneRef.current = true;
@@ -2614,9 +2612,8 @@ function App() {
 	(0, import_react.useEffect)(() => {
 		if (phase !== "ending") return;
 		const timer = window.setTimeout(() => {
-			const hugActive = hugLockedRef.current;
-			const active = hugActive ? hugAudioRef.current : bgAudioRef.current;
-			const activeToken = hugActive ? hugFadeToken : bgFadeToken;
+			const active = bgAudioRef.current;
+			const activeToken = bgFadeToken;
 			if (active && !active.paused) {
 				fadeAudioVolume(active, activeToken, 0, MUSIC_FADE_MS);
 				window.setTimeout(() => {
@@ -2657,7 +2654,6 @@ function App() {
 		};
 		trackedRef.current = /* @__PURE__ */ new Set();
 		initialStartDoneRef.current = false;
-		hugLockedRef.current = false;
 		wasVideoSilencedRef.current = false;
 		videoSceneRef.current?.reset();
 		setRunId((r) => r + 1);
