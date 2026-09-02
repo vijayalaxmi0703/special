@@ -101,6 +101,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [needsUnmute, setNeedsUnmute] = useState(false);
+  const [shouldPreload, setShouldPreload] = useState(false);
 
   const completedRef = useRef(false);
   const endedFiredRef = useRef(false);
@@ -184,6 +185,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     if (!video) return;
 
     if (active) {
+      setShouldPreload(true);
       const token = ++runTokenRef.current;
       completedRef.current = false;
       endedFiredRef.current = false;
@@ -192,6 +194,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
       video.currentTime = 0;
       void attemptPlay(video, token);
     } else {
+      setShouldPreload(false);
       runTokenRef.current++; // invalidate any in-flight attempt from this run
       if (holdTimer.current) clearTimeout(holdTimer.current);
       if (fadeTimer.current) clearTimeout(fadeTimer.current);
@@ -349,7 +352,11 @@ const handleSceneTap = (e: React.MouseEvent) => {
   return (
     <motion.div
       className="absolute inset-0 z-40 flex items-end justify-center px-5"
-      style={{ paddingBottom: `${frameBottomVh}vh`, pointerEvents: active ? "auto" : "none" }}
+      style={{ 
+        paddingBottom: `${frameBottomVh}vh`, 
+        pointerEvents: active ? "auto" : "none",
+        visibility: visible ? "visible" : "hidden"
+      }}
       onClick={handleSceneTap}
       animate={{ opacity: visible ? 1 : 0 }}
       transition={{ duration: 0.8 }}
@@ -422,11 +429,16 @@ const handleSceneTap = (e: React.MouseEvent) => {
         >
           <video
             ref={videoRef}
-            src="/video/memory.mp4"
+            src={shouldPreload ? "/video/memory.mp4" : undefined}
             playsInline
-            preload="auto"
+            preload={shouldPreload ? "auto" : "none"}
+            poster=""
             className="block w-full"
-            style={{ objectFit: "contain", maxHeight: `${frameMaxHVh}vh` }}
+            style={{ 
+              objectFit: "contain", 
+              maxHeight: `${frameMaxHVh}vh`,
+              visibility: shouldPreload ? "visible" : "hidden"
+            }}
           />
 
           <AnimatePresence>

@@ -391,8 +391,14 @@ const VIDEO_BUNNY_BOTTOM_VH = VIDEO_FRAME_TOP_VH - VIDEO_PAW_OVERLAP_VH; // deri
  * FIX 6/7 — hug.mp4 gesture priming, with a re-check at resolution time
  *           so a stale prime can never pause playback that legitimately
  *           started in the meantime.
- * FIX 8 — STICKY HUG LOCK: hugLockedRef latches to true the FIRST time
- *         phase === "hug" is seen, and never reverts (except replay()).
+ * FIX 8 (SUPERSEDED) — hug audio now tracks the live phase instead of
+ *         latching permanently once "hug" is reached: `hugActive` is
+ *         simply `phase === "hug"`. This is what lets background music
+ *         fade back in and resume from its own paused position (never
+ *         restarted) once the Hug Scene ends, instead of hug.mp4
+ *         playing forever afterward. Hug music itself is also no
+ *         longer ducked during its own scene (see the orchestration
+ *         effect), so it's clearly audible for the whole Hug Scene.
  * FIX 9 — .load() called on both tracks immediately after creation.
  * FIX 10 — FINAL-SCREEN FADE-OUT once phase reaches "ending".
  *
@@ -571,7 +577,9 @@ export default function App() {
   const activeTargetRef = useRef(MUSIC_VOLUME_FULL);
   /** FIX 8: once the hug scene is ever reached, this latches to true
       and never resets (except replay()). */
-  const hugLockedRef = useRef(false);
+  // (Former "sticky hug lock" ref removed — `hugActive` is now derived
+  // directly from `phase` each time the orchestration effect runs; see
+  // the HUG SCENE AUDIO FIX comment there for why.)
   /** VIDEO SCENE: true only while `phase === "video"`, kept in sync by
       a tiny dedicated effect below. */
   const videoActiveRef = useRef(false);
@@ -844,10 +852,15 @@ export default function App() {
     const hug = hugAudioRef.current;
     if (!bg || !hug) return;
 
-    if (phase === "hug") {
-      hugLockedRef.current = true;
-    }
-    const hugActive = hugLockedRef.current;
+    // HUG SCENE AUDIO FIX: `hugActive` now tracks the CURRENT phase
+    // directly instead of latching permanently true the first time
+    // "hug" is seen. This is what makes background music resume (from
+    // wherever it was paused, never restarted) once the Hug Scene ends
+    // — the moment `phase` moves on to "release", hugActive flips back
+    // to false and the block below treats bg as the active track again,
+    // fading hug out and fading/resuming bg from its own untouched
+    // `currentTime`.
+    const hugActive = phase === "hug";
     isHugSceneRef.current = hugActive;
 
     const active = hugActive ? hug : bg;
@@ -887,8 +900,14 @@ export default function App() {
 
     // FIX 2: never duck/un-duck across the crown+question sequence —
     // the target volume simply doesn't move for that whole block.
+    // HUG SCENE AUDIO FIX: the hug track never ducks for its own
+    // scene either — there's no competing narration audio during the
+    // Hug Scene, just the on-screen captions, so hug.mp4 should stay
+    // at its full, clearly audible volume (MUSIC_VOLUME_HUG_FULL) for
+    // the whole scene instead of sitting at the quiet "someone's
+    // talking" duck level the entire time.
     const inCrownSequence = CROWN_SEQUENCE_PHASES.has(phase);
-    const effectiveTalking = talking && !inCrownSequence;
+    const effectiveTalking = talking && !inCrownSequence && !hugActive;
 
     const activeTarget = effectiveTalking
       ? hugActive
@@ -932,9 +951,13 @@ export default function App() {
     if (phase !== "ending") return;
 
     const timer = window.setTimeout(() => {
-      const hugActive = hugLockedRef.current;
-      const active = hugActive ? hugAudioRef.current : bgAudioRef.current;
-      const activeToken = hugActive ? hugFadeToken : bgFadeToken;
+      // HUG SCENE AUDIO FIX: hug.mp4 is no longer sticky past the Hug
+      // Scene itself (see the orchestration effect above) — by the
+      // time "ending" is reached, background music has already been
+      // resumed and hug music already faded out/paused. So the track
+      // to fade here is simply background music.
+      const active = bgAudioRef.current;
+      const activeToken = bgFadeToken;
       if (active && !active.paused) {
         fadeAudioVolume(active, activeToken, 0, MUSIC_FADE_MS);
         window.setTimeout(() => {
@@ -984,7 +1007,6 @@ export default function App() {
     lastTapRef.current = { side: null, time: 0 };
     trackedRef.current = new Set();
     initialStartDoneRef.current = false;
-    hugLockedRef.current = false; // FIX 8: un-latch for the new run
     wasVideoSilencedRef.current = false; // VIDEO SCENE: reset for the new run
     videoSceneRef.current?.reset(); // VIDEO SCENE: rewind the memory itself for the new run
     setRunId((r) => r + 1);
