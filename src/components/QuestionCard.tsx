@@ -40,10 +40,10 @@ import { useEffect, useRef, useState } from "react";
  */
 
 const REACTIONS = [
-    "Wait— you actually clicked No?.Hmm… I knew you might say that.But unfortunately, I don't think I'm going to accept that answer.🤭",
-    "I'll pretend I didn't see that.,reconsider mam",
+    "Wait— No.you actually clicked No?.Hmm… I knew you might say that.But unfortunately, I don't think I'm going to accept that answer.🤭",
+    "I'll just pretend I didn't see that. Go on… reconsider, Mam",
     "Due to this bunny respectfully disagreeing, the No button has been politely dismissed.😄",
-    "Well… I suppose there's only one option left now, Mam.😁hehe"
+    "Well… I suppose there's only one option left now, Mam.hehe"
 ];
 const MAX_NO_ATTEMPTS = REACTIONS.length;
 const REACTION_HOLD_MS = 5200;

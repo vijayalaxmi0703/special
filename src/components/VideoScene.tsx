@@ -416,6 +416,7 @@ const handleSceneTap = (e: React.MouseEvent) => {
       className="absolute inset-0 z-40 flex items-end justify-center px-5"
       style={{ paddingBottom: `${frameBottomVh}vh`, pointerEvents: active ? "auto" : "none" }}
       onClick={handleSceneTap}
+      initial={false}
       animate={{ opacity: visible ? 1 : 0 }}
       transition={{ duration: 0.8 }}
     >

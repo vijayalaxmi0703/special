@@ -18,12 +18,12 @@ const TEACHER_NAME = "Sirisha";
 export const DIALOGUE_LINES: string[] = [
   "Hi Mam... 😊",
   "How are u?",
-  "I hope you're doing well.",
+  "hope you're doing well.",
   "I just wanted to say a few things to you ..",
   "So please bear with me for just a few minutes😅.",
-  "mam i could have just wished u today but..",
+  "mam i could have just wished u today through a message but..",
   "I have spent days coding this for u cuz ...",
-  "I just wanted u to feel special today and hopefully make u smile a little",
+  "I just wanted u to feel special today and hopefully make u smile a little🤗",
 
 ];
 
@@ -110,39 +110,40 @@ const NAME_CARD_HOLD_MS = 3200;
 const TEXT_LINES: Partial<Record<string, string[]>> = {
   talk: DIALOGUE_LINES,
   questionSetup: ["Mam, I have a very important question…"],
-  yesAffirm: ["Yes… it's true. ✨", "You are valued, appreciated, and remembered more than you know.. 🌷"],
+  yesAffirm: ["Yes… it's true. ✨", "You really are someone very special, Mam💗"],
   teacherImpact: [
-    "In my eyes ur the sweetest, kindest, greatest and most amazing person💕🥰",
-    "Your words, your patience, and the encouragement you give can stay with someone for a long time.",
+    "In my eyes ur the sweetest, kindest and most amazing person💕🥰",
+    "You are valued, appreciated, and remembered more than you know..",
   ],
   pgCongrats: [
     "And Mam… there's something else I want to congratulate you for.",
-    "Congratulations on your postgraduate journey. 🎓",
-    'Balancing your studies, college, and everything you manage at home is no small achievement.',
-    "Seeing you manage so much and still keep moving forward inspires me to work harder and do better too. ✨",
+    "Congratulations on your PhD journey MAM. 🎓",
+    'Balancing your studies, college, and everything you manage at home is no small achievement.✨',
+    "Sometimes I wonder how you manage to carry so much and still keep moving forward with the same dedication. Honestly, seeing you do that inspires me more than you know.",
     "I hope you’re always proud of how much you’re accomplishing, even on the days when it feels difficult."
   ],
   restMessage: [
-    "It must get exhausting sometimes isnt it…",
+    "Mamm It must get exhausting sometimes isnt it…",
     "So please remember to take some time for yourself too. ",
   ],
   drMoment: [
     "And someday…",
     NAME_CARD,
-    "I can't wait to see 'Dr.' before your name. 😊",
+    "I can't wait to see 'Dr.' before your name.🤗",
     "Until then, I'll be quietly cheering for you. 🤍",
   ],
-  preCrown: ["And for everything you do…", "you deserve this mam. 👑"],
-  crownFly: ["There… Now that looks perfect.Exactly where it belongs."],
+  preCrown: ["And for everything you are… and everything you do", "you deserve this mam. 👑"],
+  crownFly: ["There… Now that looks perfect.Exactly where it belongs.😊"],
   /** VIDEO SCENE transition: the bunny "suddenly remembers something"
       and delivers these two lines before hopping aside for the memory.
       Ordinary reading-time-based caption phase — same mechanism as
       preCrown/preHug, nothing new. */
-  videoTransition: ["Wait…", "Before we continue, there's something I wanted you to see. 👀"],
+  videoTransition: ["Wait mam..", "Before we continue, there's something I wanted you to see. 👀"],
   finalAffirmation: [
-    "So please remember…",
-    "The little things you do may mean more to your students than you'll ever know. ✨",
-    "Thank you for being someone worth looking up to. 🌷",
+    "I wanted to show u that for a reason mam, Behind this little video is someone who has been quietly watching you all along…",
+    "Admiring you, learning from you, and holding onto little words and gestures you may not even remember… but someone quietly carried with them.",
+    "And without even realizing it herself, she had slowly found warmth,comfort and inspiration in you✨",
+    "Not just from the lessons you taught… but from the person you are.😊",
   ],
   preHug: ["And this one is just for you. 🤍"],
   hug: HUG_LINES,
@@ -1187,7 +1188,7 @@ export default function App() {
         {isNameCard && (
           <motion.div
             key="dr-name-card"
-            className="pointer-events-none absolute inset-x-0 top-1/2 z-40 -translate-y-1/2 px-8 text-center"
+            className="pointer-events-none absolute inset-x-0 top-[18%] z-40 -translate-y-1/2 px-8 text-center"
             initial={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
             animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
             exit={{ opacity: 0, scale: 0.95 }}
