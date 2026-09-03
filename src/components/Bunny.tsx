@@ -327,13 +327,13 @@ function IntroBunny({
             exit={{ opacity: 0 }}
             transition={fade}
           >
-            <Slot p={P.leftEar} origin="60% 92%" animate={{ rotate: 0 }}>
+            <Slot p={P.leftEar} origin="60% 92%">
               <Img src="/bunny/left-ear.png" />
             </Slot>
-            <Slot p={P.rightEar} origin="40% 92%" animate={{ rotate: 0 }}>
+            <Slot p={P.rightEar} origin="40% 92%">
               <Img src="/bunny/right-ear.png" />
             </Slot>
-            <Slot p={P.head} origin="50% 80%" animate={{ scale: 1 }}>
+            <Slot p={P.head} origin="50% 80%">
               <Img src="/bunny/head.png" />
             </Slot>
             <Slot

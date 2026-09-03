@@ -1,8 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { jsx, jsxs } from "react/jsx-runtime";
-import { AnimatePresence, motion } from "framer-motion";
-import { RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
+import { n as __toESM } from "../_runtime.mjs";
+import { n as AnimatePresence, r as performance_default, t as motion } from "../_libs/framer-motion+[...].mjs";
+import { n as require_jsx_runtime, r as require_react } from "../_libs/react+tanstack__react-query.mjs";
+import { n as Volume2, r as RotateCcw, t as VolumeX } from "../_libs/lucide-react.mjs";
+import { t as createClient } from "../_libs/supabase__supabase-js.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-DvD9pdqN.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
 var P = {
 	leftEar: {
 		left: 172,
@@ -127,8 +130,8 @@ MOUTH_FRAMES on an interval while `talking` is true; snaps back to (and
 stays on) the closed frame the instant `talking` goes false. This is
 the entire "speaking animation" — no transforms involved. */
 function useMouthFrame(talking) {
-	const [frame, setFrame] = useState(0);
-	useEffect(() => {
+	const [frame, setFrame] = (0, import_react.useState)(0);
+	(0, import_react.useEffect)(() => {
 		if (!talking) {
 			setFrame(0);
 			return;
@@ -161,8 +164,8 @@ position (still driven only by the static P.mouth left/top), any
 existing mouth PNGs, or the mouth-opening logic above — it only
 stops the BOX from silently changing size under the fixed anchor. */
 function useMouthBoxSize(width) {
-	const [size, setSize] = useState(null);
-	useEffect(() => {
+	const [size, setSize] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
 		const img = new Image();
 		img.onload = () => {
 			const ratio = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 1;
@@ -194,7 +197,7 @@ var fade = {
 	duration: .5,
 	ease: "easeInOut"
 };
-var Slot = ({ p, origin, children, ...rest }) => /* @__PURE__ */ jsx(motion.div, {
+var Slot = ({ p, origin, children, ...rest }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 	className: "pointer-events-none absolute",
 	style: {
 		left: p.left,
@@ -206,13 +209,13 @@ var Slot = ({ p, origin, children, ...rest }) => /* @__PURE__ */ jsx(motion.div,
 	...rest,
 	children
 });
-var Img = ({ src, alt = "" }) => /* @__PURE__ */ jsx("img", {
+var Img = ({ src, alt = "" }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
 	src,
 	alt,
 	className: "pointer-events-none block w-full select-none",
 	draggable: false
 });
-var ArmPivot = ({ p, imageLeft, imageTop, src, animate, transition }) => /* @__PURE__ */ jsx(motion.div, {
+var ArmPivot = ({ p, imageLeft, imageTop, src, animate, transition }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 	className: "pointer-events-none absolute",
 	style: {
 		left: p.left,
@@ -224,14 +227,14 @@ var ArmPivot = ({ p, imageLeft, imageTop, src, animate, transition }) => /* @__P
 	},
 	animate,
 	transition,
-	children: /* @__PURE__ */ jsx("div", {
+	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "absolute",
 		style: {
 			left: imageLeft,
 			top: imageTop,
 			width: 96
 		},
-		children: /* @__PURE__ */ jsx(Img, { src })
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src })
 	})
 });
 var LOOK = {
@@ -279,7 +282,7 @@ var LOOK = {
 function IntroBunny({ phase, peekX, peekTilt, blink }) {
 	const headOn = phase !== "hidden";
 	const armOn = phase === "wave" || phase === "greeting";
-	return /* @__PURE__ */ jsxs(motion.div, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 		className: "relative",
 		style: {
 			width: 600,
@@ -293,57 +296,54 @@ function IntroBunny({ phase, peekX, peekTilt, blink }) {
 			rotate: peekTilt
 		},
 		transition: smooth,
-		children: [/* @__PURE__ */ jsx(AnimatePresence, { children: headOn && /* @__PURE__ */ jsxs(motion.div, {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: headOn && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 			className: "absolute inset-0",
 			initial: { opacity: 0 },
 			animate: { opacity: 1 },
 			exit: { opacity: 0 },
 			transition: fade,
 			children: [
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.leftEar,
 					origin: "60% 92%",
-					animate: { rotate: 0 },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/left-ear.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/left-ear.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.rightEar,
 					origin: "40% 92%",
-					animate: { rotate: 0 },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/right-ear.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/right-ear.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.head,
 					origin: "50% 80%",
-					animate: { scale: 1 },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/head.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/head.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.leftPupil,
 					origin: "50% 50%",
 					animate: { scaleY: blink ? .08 : 1 },
 					transition: { duration: .1 },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/left-pupil.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/left-pupil.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.rightPupil,
 					origin: "50% 50%",
 					animate: { scaleY: blink ? .08 : 1 },
 					transition: { duration: .1 },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/right-pupil.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/right-pupil.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.mouth,
 					origin: "50% 35%",
-					children: /* @__PURE__ */ jsx(Img, { src: MOUTH_CLOSED })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: MOUTH_CLOSED })
 				})
 			]
-		}, "intro-head-group") }), /* @__PURE__ */ jsx(AnimatePresence, { children: armOn && /* @__PURE__ */ jsx(motion.div, {
+		}, "intro-head-group") }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: armOn && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 			initial: { opacity: 0 },
 			animate: { opacity: 1 },
 			exit: { opacity: 0 },
 			transition: fade,
-			children: /* @__PURE__ */ jsx(ArmPivot, {
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArmPivot, {
 				p: P.rightShoulder,
 				imageLeft: -18,
 				imageTop: -13,
@@ -366,10 +366,10 @@ function IntroBunny({ phase, peekX, peekTilt, blink }) {
 	});
 }
 function Bunny({ pose = "idle", look = "viewer", talking = false, walking = false, smiling = false, holdingCrown = false, introPhase, peekX, peekTilt = 0, walkInFrom }) {
-	const [blink, setBlink] = useState(false);
+	const [blink, setBlink] = (0, import_react.useState)(false);
 	const mouthSrc = useMouthFrame(talking);
 	const mouthBox = useMouthBoxSize(P.mouth.width);
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		let t;
 		const loop = () => {
 			t = setTimeout(() => {
@@ -381,7 +381,7 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 		loop();
 		return () => clearTimeout(t);
 	}, []);
-	if (introPhase) return /* @__PURE__ */ jsx(IntroBunny, {
+	if (introPhase) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(IntroBunny, {
 		phase: introPhase,
 		peekX: peekX ?? 0,
 		peekTilt,
@@ -762,7 +762,7 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 		y: spring,
 		scaleY: { duration: .1 }
 	};
-	return /* @__PURE__ */ jsx(motion.div, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 		className: "relative",
 		style: {
 			width: 600,
@@ -778,13 +778,13 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 		} : false,
 		animate: rootAnim,
 		transition: rootTransition,
-		children: /* @__PURE__ */ jsxs(motion.div, {
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 			className: "absolute inset-0",
 			style: { transformOrigin: "50% 100%" },
 			animate: bobAnim,
 			transition: bobTransition,
 			children: [
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.leftEar,
 					origin: "60% 92%",
 					animate: { rotate: [
@@ -793,9 +793,9 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 						-earSwing
 					] },
 					transition: { rotate: earTransition },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/left-ear.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/left-ear.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.rightEar,
 					origin: "40% 92%",
 					animate: { rotate: [
@@ -804,9 +804,9 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 						earSwing
 					] },
 					transition: { rotate: earTransition },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/right-ear.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/right-ear.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.body,
 					origin: "50% 90%",
 					animate: {
@@ -825,26 +825,26 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 						scaleY: legIdleTransition,
 						scaleX: legIdleTransition
 					},
-					children: /* @__PURE__ */ jsx(Img, {
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, {
 						src: "/bunny/body.png",
 						alt: "A soft white plush bunny"
 					})
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.leftLeg,
 					origin: "50% 8%",
 					animate: legL,
 					transition: { rotate: walking ? legTransition : legIdleTransition },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/left-leg.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/left-leg.png" })
 				}),
-				/* @__PURE__ */ jsx(Slot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 					p: P.rightLeg,
 					origin: "50% 8%",
 					animate: legR,
 					transition: { rotate: walking ? legTransition : legIdleTransition },
-					children: /* @__PURE__ */ jsx(Img, { src: "/bunny/right-leg.png" })
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/right-leg.png" })
 				}),
-				/* @__PURE__ */ jsx(AnimatePresence, { children: showHeldCrown && /* @__PURE__ */ jsx(motion.div, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: showHeldCrown && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 					className: "pointer-events-none absolute",
 					style: {
 						left: 300,
@@ -872,12 +872,12 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 						stiffness: 55,
 						damping: 15
 					},
-					children: /* @__PURE__ */ jsx(Img, {
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, {
 						src: CROWN_ASSET,
 						alt: "A golden crown held between both hands"
 					})
 				}, "held-crown") }),
-				/* @__PURE__ */ jsxs(motion.div, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 					className: "absolute inset-0",
 					style: {
 						transformOrigin: "50% 60%",
@@ -893,7 +893,7 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 						default: spring
 					},
 					children: [
-						/* @__PURE__ */ jsx(Slot, {
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 							p: P.head,
 							origin: "50% 80%",
 							animate: { scale: [
@@ -902,32 +902,32 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 								1
 							] },
 							transition: legIdleTransition,
-							children: /* @__PURE__ */ jsx(Img, { src: "/bunny/head.png" })
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/head.png" })
 						}),
-						/* @__PURE__ */ jsx(Slot, {
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 							p: P.leftPupil,
 							origin: "50% 50%",
 							animate: pupil,
 							transition: pupilTransition,
-							children: /* @__PURE__ */ jsx(Img, { src: "/bunny/left-pupil.png" })
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/left-pupil.png" })
 						}),
-						/* @__PURE__ */ jsx(Slot, {
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 							p: P.rightPupil,
 							origin: "50% 50%",
 							animate: pupil,
 							transition: pupilTransition,
-							children: /* @__PURE__ */ jsx(Img, { src: "/bunny/right-pupil.png" })
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img, { src: "/bunny/right-pupil.png" })
 						}),
-						/* @__PURE__ */ jsx(Slot, {
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slot, {
 							p: P.mouth,
 							origin: "50% 35%",
-							children: /* @__PURE__ */ jsx("div", {
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 								style: {
 									width: P.mouth.width,
 									height: mouthBox?.height,
 									position: "relative"
 								},
-								children: /* @__PURE__ */ jsx("img", {
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
 									src: mouthSrc,
 									alt: "",
 									draggable: false,
@@ -938,7 +938,7 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 						})
 					]
 				}),
-				/* @__PURE__ */ jsx(ArmPivot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArmPivot, {
 					p: P.leftShoulder,
 					imageLeft: -79,
 					imageTop: -13,
@@ -946,7 +946,7 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 					animate: armLeft,
 					transition: armTransition
 				}),
-				/* @__PURE__ */ jsx(ArmPivot, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArmPivot, {
 					p: P.rightShoulder,
 					imageLeft: -18,
 					imageTop: -13,
@@ -958,10 +958,8 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 		})
 	});
 }
-//#endregion
-//#region src/components/Scenery.tsx
 function useSeeded(count, seed = 1) {
-	return useMemo(() => {
+	return (0, import_react.useMemo)(() => {
 		let s = seed;
 		const rnd = () => {
 			s = (s * 9301 + 49297) % 233280;
@@ -979,11 +977,11 @@ function useSeeded(count, seed = 1) {
 function Background({ showMoon = false, warm = false }) {
 	const stars = useSeeded(70, 7);
 	const motes = useSeeded(18, 31);
-	return /* @__PURE__ */ jsxs("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "pointer-events-none absolute inset-0 overflow-hidden",
 		children: [
-			/* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-night-gradient" }),
-			stars.map((s, i) => /* @__PURE__ */ jsx(motion.span, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 bg-night-gradient" }),
+			stars.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
 				className: "absolute rounded-full bg-star",
 				style: {
 					left: `${s.x}%`,
@@ -1010,7 +1008,7 @@ function Background({ showMoon = false, warm = false }) {
 					ease: "easeInOut"
 				}
 			}, `star-${i}`)),
-			motes.map((m, i) => /* @__PURE__ */ jsx(motion.span, {
+			motes.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
 				className: "absolute rounded-full bg-glow blur-[2px]",
 				style: {
 					left: `${m.x}%`,
@@ -1033,7 +1031,7 @@ function Background({ showMoon = false, warm = false }) {
 					ease: "linear"
 				}
 			}, `mote-${i}`)),
-			/* @__PURE__ */ jsx(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 				className: "absolute left-1/2 top-[58%] h-[70vmin] w-[70vmin] -translate-x-1/2 -translate-y-1/2 rounded-full bg-stage-glow blur-3xl",
 				animate: {
 					opacity: [
@@ -1053,7 +1051,7 @@ function Background({ showMoon = false, warm = false }) {
 					ease: "easeInOut"
 				}
 			}),
-			/* @__PURE__ */ jsx(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 				className: "absolute inset-0 bg-warm-wash",
 				animate: { opacity: warm ? 1 : 0 },
 				transition: {
@@ -1061,7 +1059,7 @@ function Background({ showMoon = false, warm = false }) {
 					ease: "easeInOut"
 				}
 			}),
-			/* @__PURE__ */ jsx(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 				className: "absolute left-1/2 top-[14%] h-[22vmin] w-[22vmin] -translate-x-1/2 rounded-full bg-moon shadow-moon",
 				initial: false,
 				animate: showMoon ? {
@@ -1078,16 +1076,16 @@ function Background({ showMoon = false, warm = false }) {
 					ease: "easeInOut"
 				}
 			}),
-			/* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-vignette" })
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 bg-vignette" })
 		]
 	});
 }
 function Dialogue({ line, position = "bottom", tone = "soft" }) {
-	return /* @__PURE__ */ jsx("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: `pointer-events-none absolute inset-x-0 z-50 flex justify-center px-6 ${position === "bottom" ? "bottom-[6vh]" : "top-[12vh]"}`,
-		children: /* @__PURE__ */ jsx(AnimatePresence, {
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
 			mode: "wait",
-			children: line ? /* @__PURE__ */ jsx(motion.p, {
+			children: line ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.p, {
 				initial: {
 					opacity: 0,
 					y: 14,
@@ -1119,7 +1117,7 @@ function Dialogue({ line, position = "bottom", tone = "soft" }) {
 	});
 }
 function CrownGlow({ active }) {
-	const sparks = useMemo(() => Array.from({ length: 14 }, (_, i) => {
+	const sparks = (0, import_react.useMemo)(() => Array.from({ length: 14 }, (_, i) => {
 		const angle = i / 14 * Math.PI * 2;
 		return {
 			x: Math.cos(angle) * 120,
@@ -1128,9 +1126,9 @@ function CrownGlow({ active }) {
 		};
 	}), []);
 	if (!active) return null;
-	return /* @__PURE__ */ jsxs("div", {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "pointer-events-none absolute left-1/2 top-[13%] z-30 -translate-x-1/2",
-		children: [/* @__PURE__ */ jsx(motion.div, {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 			className: "h-[36vmin] w-[36vmin] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold-burst blur-2xl",
 			initial: {
 				opacity: 0,
@@ -1154,7 +1152,7 @@ function CrownGlow({ active }) {
 				duration: 2.4,
 				ease: "easeOut"
 			}
-		}), sparks.map((s, i) => /* @__PURE__ */ jsx(motion.span, {
+		}), sparks.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
 			className: "absolute left-0 top-0 h-1.5 w-1.5 rounded-full bg-gold shadow-spark",
 			initial: {
 				opacity: 0,
@@ -1186,8 +1184,6 @@ function CrownGlow({ active }) {
 		}, i))]
 	});
 }
-//#endregion
-//#region src/components/QuestionCard.tsx
 /**
 * QuestionCard — the one deliberately non-linear beat in the whole film:
 * "I believe you are one of the best lecturers a student could ask for.
@@ -1326,14 +1322,14 @@ var pickDodgeIndex = (excludeIndex) => {
 	return idx;
 };
 function QuestionCard({ questionText, onYes, onAttempt }) {
-	const [attempts, setAttempts] = useState(0);
-	const [noOffset, setNoOffset] = useState(REST_OFFSET);
-	const [noHidden, setNoHidden] = useState(false);
-	const [reaction, setReaction] = useState(null);
-	const reactionTimer = useRef(null);
-	const hideTimer = useRef(null);
-	const lastDodgeIndex = useRef(-1);
-	useEffect(() => () => {
+	const [attempts, setAttempts] = (0, import_react.useState)(0);
+	const [noOffset, setNoOffset] = (0, import_react.useState)(REST_OFFSET);
+	const [noHidden, setNoHidden] = (0, import_react.useState)(false);
+	const [reaction, setReaction] = (0, import_react.useState)(null);
+	const reactionTimer = (0, import_react.useRef)(null);
+	const hideTimer = (0, import_react.useRef)(null);
+	const lastDodgeIndex = (0, import_react.useRef)(-1);
+	(0, import_react.useEffect)(() => () => {
 		if (reactionTimer.current) clearTimeout(reactionTimer.current);
 		if (hideTimer.current) clearTimeout(hideTimer.current);
 	}, []);
@@ -1365,14 +1361,14 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 			hideTimer.current = setTimeout(() => setNoHidden(true), FINAL_ESCAPE_DELAY_MS);
 		}
 	};
-	return /* @__PURE__ */ jsx(motion.div, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 		className: "pointer-events-none absolute inset-0 z-50 flex items-end justify-center px-5",
 		style: { paddingBottom: `3vh` },
 		initial: { opacity: 0 },
 		animate: { opacity: 1 },
 		exit: { opacity: 0 },
 		transition: { duration: .6 },
-		children: /* @__PURE__ */ jsxs("div", {
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "pointer-events-auto relative w-[92vw] max-w-sm rounded-[26px] p-[1.5px] shadow-2xl backdrop-blur-md",
 			style: {
 				maxHeight: `34vh`,
@@ -1381,25 +1377,25 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 				boxShadow: `0 0 28px ${COLOR.glow}, 0 8px 30px rgba(0,0,0,0.45)`
 			},
 			children: [
-				/* @__PURE__ */ jsx("span", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 					"aria-hidden": true,
 					className: "pointer-events-none absolute -top-2 left-5 text-sm opacity-80 sm:text-base",
 					children: "✨"
 				}),
-				/* @__PURE__ */ jsx("span", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 					"aria-hidden": true,
 					className: "pointer-events-none absolute -top-2 right-5 text-sm opacity-80 sm:text-base",
 					children: "🌙"
 				}),
-				/* @__PURE__ */ jsxs("div", {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "flex h-full flex-col justify-center gap-3 rounded-[24px] border border-dashed px-4 py-4 text-center backdrop-blur-md sm:gap-4 sm:px-6 sm:py-5",
 					style: {
 						backgroundColor: "rgba(20, 10, 40, 0.55)",
 						borderColor: COLOR.innerBorder
 					},
-					children: [/* @__PURE__ */ jsx(AnimatePresence, {
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
 						mode: "wait",
-						children: /* @__PURE__ */ jsx(motion.p, {
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.p, {
 							initial: {
 								opacity: 0,
 								y: 6
@@ -1417,11 +1413,11 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 							style: { color: COLOR.text },
 							children: reaction ?? questionText
 						}, reaction ?? "question")
-					}), /* @__PURE__ */ jsxs("div", {
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 						className: "flex h-28 w-full flex-row items-center justify-center gap-6 sm:h-32",
-						children: [/* @__PURE__ */ jsx(AnimatePresence, {
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
 							mode: "popLayout",
-							children: !noHidden && /* @__PURE__ */ jsx(motion.button, {
+							children: !noHidden && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.button, {
 								onPointerEnter: handleNoAttempt,
 								onPointerDown: handleNoAttempt,
 								onTouchStart: handleNoAttempt,
@@ -1447,7 +1443,7 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 								className: BUTTON_CLASS,
 								children: "NO"
 							}, "no-button")
-						}), /* @__PURE__ */ jsx(motion.button, {
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.button, {
 							layout: true,
 							onClick: onYes,
 							transition: { layout: {
@@ -1468,33 +1464,34 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 		})
 	});
 }
-//#endregion
-//#region src/components/VideoScene.tsx
 var HOLD_MS = 1500;
 var FADE_MS = 900;
-var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, frameMaxHVh = 75, frameBottomVh = 3 }, ref) {
-	const videoRef = useRef(null);
-	const [stage, setStage] = useState("idle");
-	const [needsUnmute, setNeedsUnmute] = useState(false);
-	const [shouldPreload, setShouldPreload] = useState(false);
-	const completedRef = useRef(false);
-	const endedFiredRef = useRef(false);
-	const holdTimer = useRef(null);
-	const fadeTimer = useRef(null);
+var VideoScene = (0, import_react.forwardRef)(function VideoScene({ active, onComplete, onEnded, frameMaxHVh = 75, frameBottomVh = 3 }, ref) {
+	const videoRef = (0, import_react.useRef)(null);
+	const [stage, setStage] = (0, import_react.useState)("idle");
+	const [needsUnmute, setNeedsUnmute] = (0, import_react.useState)(false);
+	const completedRef = (0, import_react.useRef)(false);
+	const endedFiredRef = (0, import_react.useRef)(false);
+	const holdTimer = (0, import_react.useRef)(null);
+	const fadeTimer = (0, import_react.useRef)(null);
 	/** Bumped every time `active` becomes true; async play() attempts
 	check this so a rapid active->inactive->active cycle can never
 	apply a stale attempt's result. */
-	const runTokenRef = useRef(0);
+	const runTokenRef = (0, import_react.useRef)(0);
 	/** Mirrors `active` for the native ended/error listeners, which are
 	attached once (mount-only) since the element itself never
 	unmounts anymore. */
-	const activeRef = useRef(active);
-	useEffect(() => {
+	const activeRef = (0, import_react.useRef)(active);
+	(0, import_react.useEffect)(() => {
 		activeRef.current = active;
 	}, [active]);
 	/** True once a silent, gesture-linked play()+pause() has actually
 	succeeded on this element — see `prime()` below. */
-	const primedRef = useRef(false);
+	const primedRef = (0, import_react.useRef)(false);
+	/** Guards the one-shot retry-on-error below so a genuinely broken
+	video can still fall through to finish() rather than retrying
+	forever. Reset every time `active` newly becomes true. */
+	const retriedRef = (0, import_react.useRef)(false);
 	const finish = () => {
 		if (completedRef.current) return;
 		completedRef.current = true;
@@ -1546,20 +1543,19 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 			}
 		}
 	};
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		const video = videoRef.current;
 		if (!video) return;
 		if (active) {
-			setShouldPreload(true);
 			const token = ++runTokenRef.current;
 			completedRef.current = false;
 			endedFiredRef.current = false;
+			retriedRef.current = false;
 			setNeedsUnmute(false);
 			setStage("entering");
 			video.currentTime = 0;
 			attemptPlay(video, token);
 		} else {
-			setShouldPreload(false);
 			runTokenRef.current++;
 			if (holdTimer.current) clearTimeout(holdTimer.current);
 			if (fadeTimer.current) clearTimeout(fadeTimer.current);
@@ -1567,7 +1563,7 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 			setStage("idle");
 		}
 	}, [active]);
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		const video = videoRef.current;
 		if (!video) return;
 		const handleEnded = () => {
@@ -1586,7 +1582,55 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 				}, FADE_MS);
 			}, HOLD_MS);
 		};
+		/** ROOT CAUSE OF "video scene skipped on mobile": this element has
+		had `src="/video/memory.mp4"` and `preload="auto"` set since
+		mount (so the browser starts fetching/buffering the 9MB memory
+		clip in the background, long before the video scene is ever
+		reached — which is exactly what we want for preloading). But
+		this `error` listener is attached ONCE for the component's
+		entire lifetime and, until this fix, reacted to ANY `error`
+		event by immediately calling `finish()` — which flips
+		`videoReleased` in App.tsx permanently true.
+		
+		On a flaky/slow mobile connection it's common for that
+		background preload fetch to hiccup (an aborted range request,
+		a transient network error, the OS deprioritizing/pausing an
+		off-screen media element's buffering, mobile Safari's stricter
+		concurrent-media-element limits when the bg/hug <audio>
+		elements are also preloading) and fire a native `error` event
+		on the <video> element WHILE THE VIDEO SCENE ISN'T EVEN ACTIVE
+		YET. Because `completedRef`/`videoReleased` latch permanently
+		(only reset by replay()), that one stray early error silently
+		marked the whole scene "already finished" minutes before the
+		timeline ever got there — so when the timeline actually
+		reached the video phase, App.tsx's gate saw `videoReleased`
+		already true and let `elapsed` sail straight through the
+		video's slot in a single frame, i.e. the scene was skipped
+		with nothing ever visibly playing. Desktop's faster, steadier
+		connections rarely if ever trigger this; mobile does, reliably.
+		
+		Fix: only ever treat a real `error` event as "the video failed,
+		move on" while the video scene is actually the active phase
+		(mirrors the existing `activeRef` guard already used in
+		`handleEnded` above). An error that fires during background
+		preloading, before the scene is reached, is now just logged
+		and ignored — the browser will still have another chance to
+		(re)buffer by the time `active` actually flips true, since the
+		`active` effect calls `attemptPlay()` again at that point
+		regardless of any earlier hiccup. */
 		const handleError = () => {
+			if (!activeRef.current) {
+				console.warn("[VideoScene] ignored a pre-scene media error (likely a background preload hiccup):", video.error);
+				return;
+			}
+			if (!retriedRef.current) {
+				retriedRef.current = true;
+				console.warn("[VideoScene] media error during the active scene — retrying once:", video.error);
+				const token = ++runTokenRef.current;
+				video.load();
+				attemptPlay(video, token);
+				return;
+			}
 			if (!endedFiredRef.current) {
 				endedFiredRef.current = true;
 				onEnded?.();
@@ -1600,7 +1644,7 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 			video.removeEventListener("error", handleError);
 		};
 	}, []);
-	useEffect(() => () => {
+	(0, import_react.useEffect)(() => () => {
 		if (holdTimer.current) clearTimeout(holdTimer.current);
 		if (fadeTimer.current) clearTimeout(fadeTimer.current);
 	}, []);
@@ -1643,7 +1687,7 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 		e.stopPropagation();
 		handleTogglePauseResume();
 	};
-	useImperativeHandle(ref, () => ({
+	(0, import_react.useImperativeHandle)(ref, () => ({
 		/** Silent, gesture-linked play()+pause() cycle so this exact
 		<video> element is granted gesture-based playback permission
 		ahead of time — see the top-of-file note. Safe to call from
@@ -1667,36 +1711,37 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 			const video = videoRef.current;
 			if (video) {
 				video.pause();
+				video.load();
 				video.currentTime = 0;
 			}
 			runTokenRef.current++;
 			completedRef.current = false;
 			endedFiredRef.current = false;
+			retriedRef.current = false;
 			setNeedsUnmute(false);
 			setStage("idle");
 		}
 	}), [needsUnmute, stage]);
 	const fadingOut = stage === "fading" || stage === "done";
 	const visible = active && stage !== "idle" && stage !== "done";
-	return /* @__PURE__ */ jsxs(motion.div, {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 		className: "absolute inset-0 z-40 flex items-end justify-center px-5",
 		style: {
 			paddingBottom: `${frameBottomVh}vh`,
-			pointerEvents: active ? "auto" : "none",
-			visibility: visible ? "visible" : "hidden"
+			pointerEvents: active ? "auto" : "none"
 		},
 		onClick: handleSceneTap,
 		animate: { opacity: visible ? 1 : 0 },
 		transition: { duration: .8 },
 		children: [
-			/* @__PURE__ */ jsx(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 				className: "absolute inset-0 bg-black",
 				animate: { opacity: visible && !fadingOut ? .45 : 0 },
 				transition: { duration: 1 }
 			}),
-			/* @__PURE__ */ jsx("div", {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "pointer-events-none absolute inset-0 overflow-hidden",
-				children: Array.from({ length: 14 }).map((_, i) => /* @__PURE__ */ jsx(motion.span, {
+				children: Array.from({ length: 14 }).map((_, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
 					className: "absolute rounded-full bg-gold/70",
 					style: {
 						left: `${6 + i * 37 % 90}%`,
@@ -1724,7 +1769,7 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 					}
 				}, i))
 			}),
-			/* @__PURE__ */ jsxs(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 				className: "pointer-events-auto relative w-[96vw] max-w-3xl rounded-[22px] p-[2px]",
 				style: { background: "linear-gradient(160deg, rgba(247,209,158,0.55), rgba(232,168,255,0.35))" },
 				onClick: handleFrameClick,
@@ -1741,7 +1786,7 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 						1
 					]
 				},
-				children: [/* @__PURE__ */ jsx(motion.div, {
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 					className: "pointer-events-none absolute -inset-1 rounded-[26px]",
 					style: { background: "radial-gradient(closest-side, rgba(232,168,255,0.45), transparent 70%)" },
 					animate: { opacity: visible && !fadingOut ? [
@@ -1754,26 +1799,24 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 						repeat: visible && !fadingOut ? Infinity : 0,
 						ease: "easeInOut"
 					}
-				}), /* @__PURE__ */ jsxs("div", {
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "relative overflow-hidden rounded-[20px] backdrop-blur-md",
 					style: {
 						backgroundColor: "rgba(20, 10, 40, 0.35)",
 						border: "1px solid rgba(247, 209, 158, 0.25)",
 						boxShadow: "0 0 40px rgba(232,168,255,0.3), 0 10px 40px rgba(0,0,0,0.5)"
 					},
-					children: [/* @__PURE__ */ jsx("video", {
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
 						ref: videoRef,
-						src: shouldPreload ? "/video/memory.mp4" : void 0,
+						src: "/video/memory.mp4",
 						playsInline: true,
-						preload: shouldPreload ? "auto" : "none",
-						poster: "",
+						preload: "auto",
 						className: "block w-full",
 						style: {
 							objectFit: "contain",
-							maxHeight: `${frameMaxHVh}vh`,
-							visibility: shouldPreload ? "visible" : "hidden"
+							maxHeight: `${frameMaxHVh}vh`
 						}
-					}), /* @__PURE__ */ jsx(AnimatePresence, { children: needsUnmute && (stage === "entering" || stage === "playing") && /* @__PURE__ */ jsxs(motion.button, {
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: needsUnmute && (stage === "entering" || stage === "playing") && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.button, {
 						onClick: (e) => {
 							e.stopPropagation();
 							handleUnmute();
@@ -1788,15 +1831,13 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 						},
 						exit: { opacity: 0 },
 						className: "absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream backdrop-blur-sm",
-						children: [/* @__PURE__ */ jsx(VolumeX, { size: 14 }), " Tap for sound"]
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeX, { size: 14 }), " Tap for sound"]
 					}, "unmute") })]
 				})]
 			})
 		]
 	});
 });
-//#endregion
-//#region src/lib/supabase.ts
 /**
 * FIX (previous version of this file crashed the whole app):
 * @supabase/supabase-js's createClient() throws synchronously —
@@ -1861,8 +1902,6 @@ var VideoScene = forwardRef(function VideoScene({ active, onComplete, onEnded, f
 var supabaseUrl = "https://ihiyhdkurmhbsnbvcwhd.supabase.co";
 var supabaseKey = "sb_publishable_7xi6vmDIu053xIK2op-GFA__PUF7EON";
 var supabase = Boolean(supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
-//#endregion
-//#region src/components/analytics.ts
 var SESSION_KEY = "teacher_day_session";
 function createSessionId() {
 	if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -1893,8 +1932,6 @@ async function send(event, meta) {
 function track(event, meta) {
 	send(event, meta);
 }
-//#endregion
-//#region src/components/App.tsx
 /** 🚨 No teacher name was present anywhere in the project files or
 prompts I was given, and the brief is explicit not to invent one —
 so this is the one placeholder in the whole file. Fill in the real
@@ -2261,7 +2298,7 @@ var CROWN_SEQUENCE_PHASES = /* @__PURE__ */ new Set([
 function fadeAudioVolume(audio, token, target, ms) {
 	const myToken = ++token.current;
 	const start = audio.volume;
-	const startTime = performance.now();
+	const startTime = performance_default.now();
 	const step = (now) => {
 		if (token.current !== myToken) return;
 		const t = ms <= 0 ? 1 : Math.min(1, (now - startTime) / ms);
@@ -2312,15 +2349,15 @@ async function primeTrack(audio, isStillInactive) {
 	}
 }
 function App() {
-	const [elapsed, setElapsed] = useState(0);
-	const [muted, setMuted] = useState(false);
-	const [runId, setRunId] = useState(0);
-	const [fit, setFit] = useState(() => computeFit());
-	const [answered, setAnswered] = useState(false);
+	const [elapsed, setElapsed] = (0, import_react.useState)(0);
+	const [muted, setMuted] = (0, import_react.useState)(false);
+	const [runId, setRunId] = (0, import_react.useState)(0);
+	const [fit, setFit] = (0, import_react.useState)(() => computeFit());
+	const [answered, setAnswered] = (0, import_react.useState)(false);
 	/** VIDEO SCENE gate: same idea as `answered` above. Lifted by
 	VideoScene's onComplete callback once the memory has actually
 	played out (or gracefully skipped on error). */
-	const [videoReleased, setVideoReleased] = useState(false);
+	const [videoReleased, setVideoReleased] = (0, import_react.useState)(false);
 	/** VIDEO SCENE audio: set the instant the video's native `ended`
 	event fires — deliberately BEFORE the visual hold/fade beat that
 	follows it. Background music resumes on THIS signal, not on the
@@ -2330,44 +2367,45 @@ function App() {
 	(Reset-on-entering-"video" effect lives further down, alongside
 	the other phase-derived effects — `phase` itself isn't declared
 	yet at this point in the component.) */
-	const [videoAudioDone, setVideoAudioDone] = useState(false);
+	const [videoAudioDone, setVideoAudioDone] = (0, import_react.useState)(false);
 	/** VIDEO SCENE: while the memory plays, have the bunny occasionally
 	glance toward it and back to the viewer instead of staring at one
 	spot the whole time. */
-	const [videoGlance, setVideoGlance] = useState("right");
-	useEffect(() => {
+	const [videoGlance, setVideoGlance] = (0, import_react.useState)("right");
+	(0, import_react.useEffect)(() => {
 		const id = setInterval(() => {
 			setVideoGlance((g) => g === "right" ? "viewer" : "right");
 		}, 3600);
 		return () => clearInterval(id);
 	}, []);
-	const lastTapRef = useRef({
+	const lastTapRef = (0, import_react.useRef)({
 		side: null,
 		time: 0
 	});
-	const trackedRef = useRef(/* @__PURE__ */ new Set());
+	const trackedRef = (0, import_react.useRef)(/* @__PURE__ */ new Set());
 	const trackOnce = (key, evt, meta) => {
 		if (trackedRef.current.has(key)) return;
 		trackedRef.current.add(key);
 		track(evt, meta);
 	};
-	const bgAudioRef = useRef(null);
-	const hugAudioRef = useRef(null);
-	const bgFadeToken = useRef(0);
-	const hugFadeToken = useRef(0);
+	const bgAudioRef = (0, import_react.useRef)(null);
+	const hugAudioRef = (0, import_react.useRef)(null);
+	const bgFadeToken = (0, import_react.useRef)(0);
+	const hugFadeToken = (0, import_react.useRef)(0);
 	/** FIX 1: whether the very first ever activation (of either track)
 	has happened yet — only that one moment skips the fade-up. */
-	const initialStartDoneRef = useRef(false);
+	const initialStartDoneRef = (0, import_react.useRef)(false);
 	/** FIX 5: always mirrors the orchestration effect's current
 	`activeTarget`, so tryPlayActive() can pass the right volume into
 	activateTrack() even though those call sites don't otherwise have
 	access to `talking`/`phase`. */
-	const activeTargetRef = useRef(MUSIC_VOLUME_FULL);
+	const activeTargetRef = (0, import_react.useRef)(MUSIC_VOLUME_FULL);
 	/** FIX 8: once the hug scene is ever reached, this latches to true
 	and never resets (except replay()). */
+	const hugLockedRef = (0, import_react.useRef)(false);
 	/** VIDEO SCENE: true only while `phase === "video"`, kept in sync by
 	a tiny dedicated effect below. */
-	const videoActiveRef = useRef(false);
+	const videoActiveRef = (0, import_react.useRef)(false);
 	/** VIDEO SCENE: imperative handle onto the (now permanently mounted)
 	VideoScene component — used to (a) silently prime the <video>
 	element's gesture-based audio permission on every existing
@@ -2375,22 +2413,22 @@ function App() {
 	the existing tap-to-advance/"skip" handler pause/resume the
 	actual video when tapping the middle of the screen, and (c) reset
 	the memory to its start on replay(). */
-	const videoSceneRef = useRef(null);
+	const videoSceneRef = (0, import_react.useRef)(null);
 	/** VIDEO SCENE: set the instant background/hug music gets silenced
 	for the memory video, and cleared the instant it resumes. */
-	const wasVideoSilencedRef = useRef(false);
-	const mutedRef = useRef(muted);
-	useEffect(() => {
+	const wasVideoSilencedRef = (0, import_react.useRef)(false);
+	const mutedRef = (0, import_react.useRef)(muted);
+	(0, import_react.useEffect)(() => {
 		mutedRef.current = muted;
 	}, [muted]);
-	const isHugSceneRef = useRef(false);
-	useEffect(() => {
+	const isHugSceneRef = (0, import_react.useRef)(false);
+	(0, import_react.useEffect)(() => {
 		const measure = () => setFit(computeFit());
 		measure();
 		window.addEventListener("resize", measure);
 		return () => window.removeEventListener("resize", measure);
 	}, []);
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		const bg = new Audio("/music/background.mp4");
 		bg.loop = true;
 		bg.preload = "auto";
@@ -2434,7 +2472,7 @@ function App() {
 			});
 		}
 	};
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		const events = [
 			"pointerdown",
 			"keydown",
@@ -2444,13 +2482,13 @@ function App() {
 		return () => events.forEach((evt) => window.removeEventListener(evt, tryPlayActive));
 	}, []);
 	const gateMs = !answered ? Math.max(QUESTION_SEGMENT.start, QUESTION_SEGMENT.end - 1) : !videoReleased ? Math.max(VIDEO_SEGMENT.start, VIDEO_SEGMENT.end - 1) : TOTAL_MS;
-	const gateRef = useRef(gateMs);
-	useEffect(() => {
+	const gateRef = (0, import_react.useRef)(gateMs);
+	(0, import_react.useEffect)(() => {
 		gateRef.current = gateMs;
 	}, [gateMs]);
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		let raf;
-		let last = performance.now();
+		let last = performance_default.now();
 		const tick = (now) => {
 			const dt = now - last;
 			last = now;
@@ -2460,15 +2498,15 @@ function App() {
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
 	}, [runId]);
-	const { phase, lineIndex } = useMemo(() => resolveTimeline(elapsed), [elapsed]);
-	useEffect(() => {
+	const { phase, lineIndex } = (0, import_react.useMemo)(() => resolveTimeline(elapsed), [elapsed]);
+	(0, import_react.useEffect)(() => {
 		videoActiveRef.current = phase === "video";
 		if (phase === "video") setVideoAudioDone(false);
 	}, [phase]);
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		track("page_opened");
 	}, []);
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		if (phase === "introGreeting") trackOnce("hi_shown", "hi_shown");
 		if (phase === "questionActive") trackOnce("question_shown", "question_shown");
 		if (phase === "drMoment") trackOnce("dr_scene", "dr_scene");
@@ -2481,7 +2519,7 @@ function App() {
 	/** VIDEO SCENE: bunny slides slightly aside once the memory itself is
 	on screen. */
 	const isVideoScene = phase === "video";
-	const pose = useMemo(() => {
+	const pose = (0, import_react.useMemo)(() => {
 		switch (phase) {
 			case "introHidden":
 			case "introPeek":
@@ -2514,7 +2552,7 @@ function App() {
 			default: return "sit";
 		}
 	}, [phase]);
-	const look = useMemo(() => {
+	const look = (0, import_react.useMemo)(() => {
 		if (isIntro) return "viewer";
 		if (phase === "noticeCrown" || phase === "walkToCrown" || phase === "grabCrown") return "crown";
 		if (phase === "talk") return lineIndex % 4 === 2 ? "shy" : "viewer";
@@ -2530,7 +2568,7 @@ function App() {
 	const leftHidden = computeLeftHidden(fit);
 	const leftVisible = computeLeftVisible(fit);
 	const peekTilt = isIntro && phase !== "introHidden" ? PEEK_TILT : 0;
-	const walkInFrom = useMemo(() => ({
+	const walkInFrom = (0, import_react.useMemo)(() => ({
 		x: computeWalkInX(fit, leftVisible),
 		y: 6,
 		rotate: PEEK_TILT
@@ -2561,11 +2599,12 @@ function App() {
 		"drMoment",
 		"finalAffirmation"
 	].includes(phase);
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		const bg = bgAudioRef.current;
 		const hug = hugAudioRef.current;
 		if (!bg || !hug) return;
-		const hugActive = phase === "hug";
+		if (phase === "hug") hugLockedRef.current = true;
+		const hugActive = hugLockedRef.current;
 		isHugSceneRef.current = hugActive;
 		const active = hugActive ? hug : bg;
 		const inactive = hugActive ? bg : hug;
@@ -2592,7 +2631,7 @@ function App() {
 			return () => window.clearTimeout(pauseTimer);
 		}
 		const inCrownSequence = CROWN_SEQUENCE_PHASES.has(phase);
-		const activeTarget = talking && !inCrownSequence && !hugActive ? hugActive ? MUSIC_VOLUME_HUG_DUCKED : MUSIC_VOLUME_DUCKED : hugActive ? MUSIC_VOLUME_HUG_FULL : MUSIC_VOLUME_FULL;
+		const activeTarget = talking && !inCrownSequence ? hugActive ? MUSIC_VOLUME_HUG_DUCKED : MUSIC_VOLUME_DUCKED : hugActive ? MUSIC_VOLUME_HUG_FULL : MUSIC_VOLUME_FULL;
 		activeTargetRef.current = activeTarget;
 		if (active.paused) {
 			initialStartDoneRef.current = true;
@@ -2618,11 +2657,12 @@ function App() {
 		videoAudioDone
 	]);
 	/** FIX 10 — FINAL-SCREEN FADE-OUT. */
-	useEffect(() => {
+	(0, import_react.useEffect)(() => {
 		if (phase !== "ending") return;
 		const timer = window.setTimeout(() => {
-			const active = bgAudioRef.current;
-			const activeToken = bgFadeToken;
+			const hugActive = hugLockedRef.current;
+			const active = hugActive ? hugAudioRef.current : bgAudioRef.current;
+			const activeToken = hugActive ? hugFadeToken : bgFadeToken;
 			if (active && !active.paused) {
 				fadeAudioVolume(active, activeToken, 0, MUSIC_FADE_MS);
 				window.setTimeout(() => {
@@ -2663,6 +2703,7 @@ function App() {
 		};
 		trackedRef.current = /* @__PURE__ */ new Set();
 		initialStartDoneRef.current = false;
+		hugLockedRef.current = false;
 		wasVideoSilencedRef.current = false;
 		videoSceneRef.current?.reset();
 		setRunId((r) => r + 1);
@@ -2671,7 +2712,7 @@ function App() {
 	const nudge = (direction) => {
 		tryPlayActive();
 		const side = direction === -1 ? "left" : "right";
-		const now = performance.now();
+		const now = performance_default.now();
 		const isDoubleTap = lastTapRef.current.side === side && now - lastTapRef.current.time < DOUBLE_TAP_WINDOW_MS;
 		lastTapRef.current = {
 			side,
@@ -2692,11 +2733,11 @@ function App() {
 	const genericLine = TEXT_LINES[phase]?.[lineIndex] ?? null;
 	const isNameCard = genericLine === NAME_CARD;
 	const dialogueLine = phase === "introGreeting" || phase === "introEnter" ? DIALOGUE_LINES[0] : phase === "questionActive" ? answered ? QUESTION_TEXT : null : isNameCard ? null : genericLine;
-	return /* @__PURE__ */ jsxs("main", {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
 		onClick: skip,
 		className: "relative h-[100dvh] w-full overflow-hidden bg-background font-body select-none",
 		children: [
-			/* @__PURE__ */ jsx(Background, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Background, {
 				showMoon: phase === "ending",
 				warm: [
 					"raiseCrown",
@@ -2705,7 +2746,7 @@ function App() {
 					"hug"
 				].includes(phase)
 			}),
-			/* @__PURE__ */ jsx(AnimatePresence, { children: groundCrown && /* @__PURE__ */ jsx(motion.img, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: groundCrown && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.img, {
 				src: "/crown.png",
 				alt: "A golden crown",
 				className: "pointer-events-none absolute bottom-[20dvh] right-[14vw] z-20 w-[22vw] max-w-[130px] drop-shadow-glow",
@@ -2736,9 +2777,9 @@ function App() {
 					}
 				}
 			}, "crown-ground") }),
-			introPh ? /* @__PURE__ */ jsx("div", {
+			introPh ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "pointer-events-none absolute inset-0 z-20 overflow-hidden",
-				children: /* @__PURE__ */ jsx(motion.div, {
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 					className: "absolute bottom-0",
 					style: {
 						width: 600,
@@ -2750,13 +2791,13 @@ function App() {
 						scale: fit
 					},
 					transition: peekTransition,
-					children: /* @__PURE__ */ jsx(Bunny, {
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Bunny, {
 						introPhase: introPh,
 						peekX: 0,
 						peekTilt
 					})
 				})
-			}) : /* @__PURE__ */ jsx("div", {
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "absolute left-1/2",
 				style: {
 					width: 600,
@@ -2769,13 +2810,13 @@ function App() {
 					pointerEvents: isVideoScene ? "none" : void 0,
 					transition: "bottom 1.1s cubic-bezier(0.22,1,0.36,1), height 1.1s cubic-bezier(0.22,1,0.36,1), transform 1.1s cubic-bezier(0.22,1,0.36,1)"
 				},
-				children: /* @__PURE__ */ jsx("div", {
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 					className: "w-full",
 					style: isVideoScene ? {
 						height: "100%",
 						overflow: "hidden"
 					} : { height: "100%" },
-					children: /* @__PURE__ */ jsx(motion.div, {
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
 						animate: isVideoScene ? {
 							x: 0,
 							y: -0
@@ -2792,7 +2833,7 @@ function App() {
 								1
 							]
 						},
-						children: /* @__PURE__ */ jsx(Bunny, {
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Bunny, {
 							pose,
 							look: isVideoScene ? videoGlance : look,
 							talking,
@@ -2804,13 +2845,13 @@ function App() {
 					})
 				})
 			}),
-			/* @__PURE__ */ jsx(AnimatePresence, { children: phase === "hug" && /* @__PURE__ */ jsxs(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: phase === "hug" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 				className: "pointer-events-none absolute inset-0 z-30",
 				initial: { opacity: 0 },
 				animate: { opacity: 1 },
 				exit: { opacity: 0 },
 				transition: { duration: 1 },
-				children: [/* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-hug-vignette" }), Array.from({ length: 12 }).map((_, i) => /* @__PURE__ */ jsx(motion.svg, {
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 bg-hug-vignette" }), Array.from({ length: 12 }).map((_, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.svg, {
 					viewBox: "0 0 32 29",
 					className: "absolute h-6 w-6",
 					style: {
@@ -2837,13 +2878,13 @@ function App() {
 						repeat: Infinity,
 						ease: "easeOut"
 					},
-					children: /* @__PURE__ */ jsx("path", {
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
 						fill: "currentColor",
 						d: "M16 29S1 19.6 1 10.2A9.2 9.2 0 0 1 16 4.4 9.2 9.2 0 0 1 31 10.2C31 19.6 16 29 16 29z"
 					})
 				}, i))]
 			}, "hug-fx") }),
-			/* @__PURE__ */ jsx(AnimatePresence, { children: phase === "crownFly" && /* @__PURE__ */ jsx(motion.img, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: phase === "crownFly" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.img, {
 				src: "/crown.png",
 				alt: "A golden crown",
 				className: "pointer-events-none absolute left-1/2 z-40 w-[34vw] max-w-[180px] drop-shadow-glow",
@@ -2875,8 +2916,8 @@ function App() {
 					]
 				}
 			}, "crown-fly") }),
-			/* @__PURE__ */ jsx(CrownGlow, { active: phase === "crownFly" }),
-			/* @__PURE__ */ jsx(VideoScene, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CrownGlow, { active: phase === "crownFly" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(VideoScene, {
 				ref: videoSceneRef,
 				active: phase === "video",
 				frameMaxHVh: VIDEO_FRAME_MAX_H_VH,
@@ -2884,7 +2925,7 @@ function App() {
 				onEnded: () => setVideoAudioDone(true),
 				onComplete: () => setVideoReleased(true)
 			}),
-			/* @__PURE__ */ jsx(AnimatePresence, { children: isNameCard && /* @__PURE__ */ jsxs(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: isNameCard && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 				className: "pointer-events-none absolute inset-x-0 top-1/2 z-40 -translate-y-1/2 px-8 text-center",
 				initial: {
 					opacity: 0,
@@ -2909,20 +2950,20 @@ function App() {
 						1
 					]
 				},
-				children: [/* @__PURE__ */ jsx("p", {
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 					className: "font-display text-xs uppercase tracking-[0.35em] text-cream/60 sm:text-sm",
 					children: "Someday"
-				}), /* @__PURE__ */ jsxs("p", {
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
 					className: "mt-2 font-display text-4xl text-gold drop-shadow-glow sm:text-5xl",
 					children: ["Dr. ", TEACHER_NAME]
 				})]
 			}, "dr-name-card") }),
-			/* @__PURE__ */ jsx("div", { className: "pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[26vh] bg-subtitle-scrim" }),
-			/* @__PURE__ */ jsx(Dialogue, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[26vh] bg-subtitle-scrim" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dialogue, {
 				line: dialogueLine,
 				tone: phase === "crownFly" ? "gold" : "soft"
 			}),
-			/* @__PURE__ */ jsx(AnimatePresence, { children: phase === "questionActive" && !answered && /* @__PURE__ */ jsx(QuestionCard, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: phase === "questionActive" && !answered && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuestionCard, {
 				questionText: QUESTION_TEXT,
 				onYes: handleYes,
 				onAttempt: (n) => {
@@ -2930,7 +2971,7 @@ function App() {
 					if (n === 1) trackOnce("no_clicked", "no_clicked");
 				}
 			}) }),
-			/* @__PURE__ */ jsx(AnimatePresence, { children: phase === "ending" && /* @__PURE__ */ jsxs(motion.div, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: phase === "ending" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
 				className: "pointer-events-none absolute inset-x-0 top-[30%] z-40 px-8 text-center",
 				initial: {
 					opacity: 0,
@@ -2947,10 +2988,10 @@ function App() {
 					delay: 1.2,
 					ease: "easeOut"
 				},
-				children: [/* @__PURE__ */ jsx("h1", {
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
 					className: "font-display text-3xl leading-tight text-gold drop-shadow-glow sm:text-4xl",
 					children: "Happy Teacher's Day, Mam! ❤️"
-				}), /* @__PURE__ */ jsx(motion.p, {
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.p, {
 					className: "mt-3 font-display text-lg text-cream/90",
 					initial: { opacity: 0 },
 					animate: { opacity: 1 },
@@ -2961,7 +3002,7 @@ function App() {
 					children: "With lots of respect and gratitude."
 				})]
 			}, "ending") }),
-			/* @__PURE__ */ jsx("div", {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				onClick: (e) => {
 					e.stopPropagation();
 					nudge(-1);
@@ -2970,7 +3011,7 @@ function App() {
 				className: "absolute inset-y-0 left-0 z-30",
 				style: { width: NAV_ZONE_WIDTH }
 			}),
-			/* @__PURE__ */ jsx("div", {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				onClick: (e) => {
 					e.stopPropagation();
 					nudge(1);
@@ -2979,16 +3020,16 @@ function App() {
 				className: "absolute inset-y-0 right-0 z-30",
 				style: { width: NAV_ZONE_WIDTH }
 			}),
-			/* @__PURE__ */ jsx("button", {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 				onClick: (e) => {
 					e.stopPropagation();
 					toggleSound();
 				},
 				"aria-label": muted ? "Turn music on" : "Turn music off",
 				className: "absolute right-4 top-4 z-50 rounded-full border border-cream/20 bg-cream/10 p-3 text-cream backdrop-blur-sm transition-colors hover:bg-cream/20",
-				children: muted ? /* @__PURE__ */ jsx(VolumeX, { size: 18 }) : /* @__PURE__ */ jsx(Volume2, { size: 18 })
+				children: muted ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeX, { size: 18 }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Volume2, { size: 18 })
 			}),
-			/* @__PURE__ */ jsx(AnimatePresence, { children: phase === "ending" && /* @__PURE__ */ jsxs(motion.button, {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: phase === "ending" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.button, {
 				onClick: (e) => {
 					e.stopPropagation();
 					replay();
@@ -3007,13 +3048,11 @@ function App() {
 					duration: 1
 				},
 				className: "absolute bottom-6 right-5 z-50 flex items-center gap-2 rounded-full border border-gold/40 bg-gold/15 px-4 py-2 font-display text-sm text-gold backdrop-blur-sm transition-colors hover:bg-gold/25",
-				children: [/* @__PURE__ */ jsx(RotateCcw, { size: 16 }), " Watch again"]
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RotateCcw, { size: 16 }), " Watch again"]
 			}, "replay") })
 		]
 	});
 }
-//#endregion
-//#region src/routes/index.tsx?tsr-split=component
 var SplitComponent = App;
 //#endregion
 export { SplitComponent as component };

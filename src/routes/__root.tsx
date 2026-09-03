@@ -77,12 +77,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Happy Teacher's Day" },
-      { name: "description", content: "A little Teacher's Day surprise." },
-      { property: "og:title", content: "Happy Teacher's Day" },
-      { property: "og:description", content: "A little Teacher's Day surprise." },
+      { title: "Lovable App" },
+      { name: "description", content: "Lovable Generated Project" },
+      { name: "author", content: "Lovable" },
+      { property: "og:title", content: "Lovable App" },
+      { property: "og:description", content: "Lovable Generated Project" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -95,13 +97,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      // No custom favicon exists in public/ for this project. The
-      // previous `{ rel: "icon", href: "", type: "" }` entry rendered
-      // a broken/empty icon link, which is what let the browser fall
-      // back to a platform-level default (the Lovable icon) on the
-      // deployed tab. Removed entirely per "remove the favicon if no
-      // custom one exists" — add a real `{ rel: "icon", href: "/your-favicon.ico" }`
-      // entry here once a favicon file is placed in public/.
+      { rel: "icon", href: "", type: "" },
     ],
   }),
   shellComponent: RootShell,

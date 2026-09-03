@@ -101,7 +101,6 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [needsUnmute, setNeedsUnmute] = useState(false);
-  const [shouldPreload, setShouldPreload] = useState(false);
 
   const completedRef = useRef(false);
   const endedFiredRef = useRef(false);
@@ -121,6 +120,10 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   /** True once a silent, gesture-linked play()+pause() has actually
       succeeded on this element — see `prime()` below. */
   const primedRef = useRef(false);
+  /** Guards the one-shot retry-on-error below so a genuinely broken
+      video can still fall through to finish() rather than retrying
+      forever. Reset every time `active` newly becomes true. */
+  const retriedRef = useRef(false);
 
   const finish = () => {
     if (completedRef.current) return;
@@ -185,16 +188,15 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     if (!video) return;
 
     if (active) {
-      setShouldPreload(true);
       const token = ++runTokenRef.current;
       completedRef.current = false;
       endedFiredRef.current = false;
+      retriedRef.current = false;
       setNeedsUnmute(false);
       setStage("entering");
       video.currentTime = 0;
       void attemptPlay(video, token);
     } else {
-      setShouldPreload(false);
       runTokenRef.current++; // invalidate any in-flight attempt from this run
       if (holdTimer.current) clearTimeout(holdTimer.current);
       if (fadeTimer.current) clearTimeout(fadeTimer.current);
@@ -228,7 +230,61 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
       }, HOLD_MS);
     };
 
+    /** ROOT CAUSE OF "video scene skipped on mobile": this element has
+        had `src="/video/memory.mp4"` and `preload="auto"` set since
+        mount (so the browser starts fetching/buffering the 9MB memory
+        clip in the background, long before the video scene is ever
+        reached — which is exactly what we want for preloading). But
+        this `error` listener is attached ONCE for the component's
+        entire lifetime and, until this fix, reacted to ANY `error`
+        event by immediately calling `finish()` — which flips
+        `videoReleased` in App.tsx permanently true.
+
+        On a flaky/slow mobile connection it's common for that
+        background preload fetch to hiccup (an aborted range request,
+        a transient network error, the OS deprioritizing/pausing an
+        off-screen media element's buffering, mobile Safari's stricter
+        concurrent-media-element limits when the bg/hug <audio>
+        elements are also preloading) and fire a native `error` event
+        on the <video> element WHILE THE VIDEO SCENE ISN'T EVEN ACTIVE
+        YET. Because `completedRef`/`videoReleased` latch permanently
+        (only reset by replay()), that one stray early error silently
+        marked the whole scene "already finished" minutes before the
+        timeline ever got there — so when the timeline actually
+        reached the video phase, App.tsx's gate saw `videoReleased`
+        already true and let `elapsed` sail straight through the
+        video's slot in a single frame, i.e. the scene was skipped
+        with nothing ever visibly playing. Desktop's faster, steadier
+        connections rarely if ever trigger this; mobile does, reliably.
+
+        Fix: only ever treat a real `error` event as "the video failed,
+        move on" while the video scene is actually the active phase
+        (mirrors the existing `activeRef` guard already used in
+        `handleEnded` above). An error that fires during background
+        preloading, before the scene is reached, is now just logged
+        and ignored — the browser will still have another chance to
+        (re)buffer by the time `active` actually flips true, since the
+        `active` effect calls `attemptPlay()` again at that point
+        regardless of any earlier hiccup. */
     const handleError = () => {
+      if (!activeRef.current) {
+        // eslint-disable-next-line no-console
+        console.warn("[VideoScene] ignored a pre-scene media error (likely a background preload hiccup):", video.error);
+        return;
+      }
+      // One-shot retry: a genuine error while the scene IS active (a
+      // real network drop mid-playback, not the pre-scene case above)
+      // still deserves one reload+replay attempt before we give up and
+      // skip — a single transient blip shouldn't cost the whole scene.
+      if (!retriedRef.current) {
+        retriedRef.current = true;
+        // eslint-disable-next-line no-console
+        console.warn("[VideoScene] media error during the active scene — retrying once:", video.error);
+        const token = ++runTokenRef.current;
+        video.load();
+        void attemptPlay(video, token);
+        return;
+      }
       if (!endedFiredRef.current) {
         endedFiredRef.current = true;
         onEnded?.();
@@ -333,11 +389,17 @@ const handleSceneTap = (e: React.MouseEvent) => {
         const video = videoRef.current;
         if (video) {
           video.pause();
+          // .load() clears any stale `video.error` from a previous run
+          // (e.g. the retried-and-still-failed case above) so a fresh
+          // run always starts from a clean media state, not one still
+          // carrying a prior error.
+          video.load();
           video.currentTime = 0;
         }
         runTokenRef.current++;
         completedRef.current = false;
         endedFiredRef.current = false;
+        retriedRef.current = false;
         setNeedsUnmute(false);
         setStage("idle");
       },
@@ -352,11 +414,7 @@ const handleSceneTap = (e: React.MouseEvent) => {
   return (
     <motion.div
       className="absolute inset-0 z-40 flex items-end justify-center px-5"
-      style={{ 
-        paddingBottom: `${frameBottomVh}vh`, 
-        pointerEvents: active ? "auto" : "none",
-        visibility: visible ? "visible" : "hidden"
-      }}
+      style={{ paddingBottom: `${frameBottomVh}vh`, pointerEvents: active ? "auto" : "none" }}
       onClick={handleSceneTap}
       animate={{ opacity: visible ? 1 : 0 }}
       transition={{ duration: 0.8 }}
@@ -429,16 +487,11 @@ const handleSceneTap = (e: React.MouseEvent) => {
         >
           <video
             ref={videoRef}
-            src={shouldPreload ? "/video/memory.mp4" : undefined}
+            src="/video/memory.mp4"
             playsInline
-            preload={shouldPreload ? "auto" : "none"}
-            poster=""
+            preload="auto"
             className="block w-full"
-            style={{ 
-              objectFit: "contain", 
-              maxHeight: `${frameMaxHVh}vh`,
-              visibility: shouldPreload ? "visible" : "hidden"
-            }}
+            style={{ objectFit: "contain", maxHeight: `${frameMaxHVh}vh` }}
           />
 
           <AnimatePresence>
