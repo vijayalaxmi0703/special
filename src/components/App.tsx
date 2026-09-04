@@ -678,6 +678,8 @@ export default function App() {
     // `activateTrackWithRetry` calls (FIX 3) already trigger the real
     // fetch the moment the first user gesture happens, which is the
     // earliest point the browser will actually let audio play anyway.
+    // DIAGNOSTIC: temporarily disable application Audio objects
+    
     const bg = new Audio("/music/background.mp4");
     bg.loop = true;
     bg.preload = "metadata";
@@ -699,6 +701,7 @@ export default function App() {
       bgAudioRef.current = null;
       hugAudioRef.current = null;
     };
+    
   }, []);
 
   /** FIX 3: the shared "try to start/resume the correct track right

@@ -16,12 +16,12 @@ globalThis.__nitro_vite_envs__ = services;
 //#endregion
 //#region #nitro/virtual/public-assets-data
 var public_assets_data_default = {
-	"/robots.txt": {
-		"type": "text/plain; charset=utf-8",
-		"etag": "\"a0-CKGXSIe7TSsqDTmGm/nY1t/o5d0\"",
-		"mtime": "2026-09-04T06:18:28.145Z",
-		"size": 160,
-		"path": "../public/robots.txt"
+	"/crown.png": {
+		"type": "image/png",
+		"etag": "\"16d0c-AxJ8PPIhH3M+xTeSKHG5nzsywkE\"",
+		"mtime": "2026-09-04T06:18:28.129Z",
+		"size": 93452,
+		"path": "../public/crown.png"
 	},
 	"/left-arm.png": {
 		"type": "image/png",
@@ -30,6 +30,13 @@ var public_assets_data_default = {
 		"size": 44254,
 		"path": "../public/left-arm.png"
 	},
+	"/robots.txt": {
+		"type": "text/plain; charset=utf-8",
+		"etag": "\"a0-CKGXSIe7TSsqDTmGm/nY1t/o5d0\"",
+		"mtime": "2026-09-04T06:18:28.145Z",
+		"size": 160,
+		"path": "../public/robots.txt"
+	},
 	"/right-arm.png": {
 		"type": "image/png",
 		"etag": "\"9ff4-Qqrisj8fL4HH7OhdaL2Pj5ghpao\"",
@@ -37,33 +44,26 @@ var public_assets_data_default = {
 		"size": 40948,
 		"path": "../public/right-arm.png"
 	},
-	"/crown.png": {
-		"type": "image/png",
-		"etag": "\"16d0c-AxJ8PPIhH3M+xTeSKHG5nzsywkE\"",
-		"mtime": "2026-09-04T06:18:28.129Z",
-		"size": 93452,
-		"path": "../public/crown.png"
-	},
-	"/assets/index-WoTpOns2.js": {
-		"type": "text/javascript; charset=utf-8",
-		"etag": "\"54be3-VtMIkG/2aHsgbeDX/b341jKqZ30\"",
-		"mtime": "2026-09-04T16:47:51.386Z",
-		"size": 347107,
-		"path": "../public/assets/index-WoTpOns2.js"
+	"/assets/styles-DQibvGOj.css": {
+		"type": "text/css; charset=utf-8",
+		"etag": "\"13de5-aNjHsKr3YxPKoydI8PiFWSsGjmI\"",
+		"mtime": "2026-09-04T16:56:17.794Z",
+		"size": 81381,
+		"path": "../public/assets/styles-DQibvGOj.css"
 	},
 	"/assets/routes-BxKJJkQr.js": {
 		"type": "text/javascript; charset=utf-8",
 		"etag": "\"5bdb5-LlftMipsctvCMdMsrmrUHtrTc6k\"",
-		"mtime": "2026-09-04T16:47:51.387Z",
+		"mtime": "2026-09-04T16:56:17.786Z",
 		"size": 376245,
 		"path": "../public/assets/routes-BxKJJkQr.js"
 	},
-	"/assets/styles-DQibvGOj.css": {
-		"type": "text/css; charset=utf-8",
-		"etag": "\"13de5-aNjHsKr3YxPKoydI8PiFWSsGjmI\"",
-		"mtime": "2026-09-04T16:47:51.387Z",
-		"size": 81381,
-		"path": "../public/assets/styles-DQibvGOj.css"
+	"/assets/index-WoTpOns2.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"54be3-VtMIkG/2aHsgbeDX/b341jKqZ30\"",
+		"mtime": "2026-09-04T16:56:17.786Z",
+		"size": 347107,
+		"path": "../public/assets/index-WoTpOns2.js"
 	},
 	"/bunny/head.png": {
 		"type": "image/png",
@@ -71,13 +71,6 @@ var public_assets_data_default = {
 		"mtime": "2026-09-04T06:18:28.202Z",
 		"size": 202597,
 		"path": "../public/bunny/head.png"
-	},
-	"/bunny/left-arm.png": {
-		"type": "image/png",
-		"etag": "\"bfb8-xDp16/Jq85eszmgzzkMHi73g/W0\"",
-		"mtime": "2026-09-04T06:18:28.216Z",
-		"size": 49080,
-		"path": "../public/bunny/left-arm.png"
 	},
 	"/bunny/left-leg.png": {
 		"type": "image/png",
@@ -93,19 +86,19 @@ var public_assets_data_default = {
 		"size": 78091,
 		"path": "../public/bunny/left-ear.png"
 	},
+	"/bunny/left-arm.png": {
+		"type": "image/png",
+		"etag": "\"bfb8-xDp16/Jq85eszmgzzkMHi73g/W0\"",
+		"mtime": "2026-09-04T06:18:28.216Z",
+		"size": 49080,
+		"path": "../public/bunny/left-arm.png"
+	},
 	"/bunny/left-pupil.png": {
 		"type": "image/png",
 		"etag": "\"23fe-68GYur4uCSczWLrnK8z6GGc2jO0\"",
 		"mtime": "2026-09-04T06:18:28.194Z",
 		"size": 9214,
 		"path": "../public/bunny/left-pupil.png"
-	},
-	"/bunny/mouth-mid.png": {
-		"type": "image/png",
-		"etag": "\"166ef-F4eIEYIFrb8u4h0vPdfH7BWhmjQ\"",
-		"mtime": "2026-09-04T06:18:28.182Z",
-		"size": 91887,
-		"path": "../public/bunny/mouth-mid.png"
 	},
 	"/bunny/mouth-open.png": {
 		"type": "image/png",
@@ -114,12 +107,12 @@ var public_assets_data_default = {
 		"size": 95319,
 		"path": "../public/bunny/mouth-open.png"
 	},
-	"/bunny/right-ear.png": {
+	"/bunny/mouth-mid.png": {
 		"type": "image/png",
-		"etag": "\"12709-pDEs4LoWPZrijIRbs5zk7VkVh3c\"",
-		"mtime": "2026-09-04T06:18:28.152Z",
-		"size": 75529,
-		"path": "../public/bunny/right-ear.png"
+		"etag": "\"166ef-F4eIEYIFrb8u4h0vPdfH7BWhmjQ\"",
+		"mtime": "2026-09-04T06:18:28.182Z",
+		"size": 91887,
+		"path": "../public/bunny/mouth-mid.png"
 	},
 	"/bunny/mouth.png": {
 		"type": "image/png",
@@ -148,6 +141,13 @@ var public_assets_data_default = {
 		"mtime": "2026-09-04T06:18:28.166Z",
 		"size": 9096,
 		"path": "../public/bunny/right-pupil.png"
+	},
+	"/bunny/right-ear.png": {
+		"type": "image/png",
+		"etag": "\"12709-pDEs4LoWPZrijIRbs5zk7VkVh3c\"",
+		"mtime": "2026-09-04T06:18:28.152Z",
+		"size": 75529,
+		"path": "../public/bunny/right-ear.png"
 	},
 	"/bunny/body.png": {
 		"type": "image/png",
