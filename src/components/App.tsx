@@ -117,7 +117,7 @@ const NAME_CARD_HOLD_MS = 3200;
     `videoReleased` below). */
 const TEXT_LINES: Partial<Record<string, string[]>> = {
   talk: DIALOGUE_LINES,
-  questionSetup: ["Mam, I have a very important question…"],
+  questionSetup: ["ok now..Mam, I have a very important question… plz dont mind and answer it"],
   yesAffirm: ["Yes… it's true. ✨", "You really are someone very special, Mam💗"],
   teacherImpact: [
     "In my eyes ur the sweetest, kindest and most amazing person💕🥰",
@@ -125,7 +125,7 @@ const TEXT_LINES: Partial<Record<string, string[]>> = {
   ],
   pgCongrats: [
     "And Mam… there's something else I want to congratulate you for.",
-    "Congratulations on your PhD journey MAM. 🎓",
+    "Congratulations on your PhD journey MAM. 🥰",
     "Balancing your studies, college, and everything you manage at home is no small achievement.✨",
     "Sometimes I wonder how you manage to carry so much and still keep moving forward with the same dedication. Honestly, seeing you do that inspires me more than you know.",
     "I hope you’re always proud of how much you’re accomplishing, even on the days when it feels difficult.",
@@ -1386,9 +1386,9 @@ export default function App() {
       <p className="font-display text-xl leading-relaxed text-cream drop-shadow-glow sm:text-2xl">
         Sorry for taking a few minutes of your time, Mam...Thank you for watching this till the end. 
         <br />
-        I hope this made u smile a little 😊
+        I hope this made u smile a little😊
         <br />
-       Take care mam
+       Take care mam💕
       </p>
     </motion.div>
   )}

@@ -23,12 +23,19 @@ var public_assets_data_default = {
 		"size": 93452,
 		"path": "../public/crown.png"
 	},
-	"/left-arm.png": {
+	"/right-arm.png": {
 		"type": "image/png",
-		"etag": "\"acde-NjSp/oAVIQyjsKJshj8JK0BnNPU\"",
-		"mtime": "2026-09-04T06:18:28.140Z",
-		"size": 44254,
-		"path": "../public/left-arm.png"
+		"etag": "\"9ff4-Qqrisj8fL4HH7OhdaL2Pj5ghpao\"",
+		"mtime": "2026-09-04T06:18:28.135Z",
+		"size": 40948,
+		"path": "../public/right-arm.png"
+	},
+	"/assets/styles-BydkY9FB.css": {
+		"type": "text/css; charset=utf-8",
+		"etag": "\"13c85-pvDb/p5ZIJGgTgufM77hZKzzQmw\"",
+		"mtime": "2026-09-04T18:25:22.267Z",
+		"size": 81029,
+		"path": "../public/assets/styles-BydkY9FB.css"
 	},
 	"/robots.txt": {
 		"type": "text/plain; charset=utf-8",
@@ -37,54 +44,19 @@ var public_assets_data_default = {
 		"size": 160,
 		"path": "../public/robots.txt"
 	},
-	"/right-arm.png": {
-		"type": "image/png",
-		"etag": "\"9ff4-Qqrisj8fL4HH7OhdaL2Pj5ghpao\"",
-		"mtime": "2026-09-04T06:18:28.135Z",
-		"size": 40948,
-		"path": "../public/right-arm.png"
-	},
-	"/assets/styles-DQibvGOj.css": {
-		"type": "text/css; charset=utf-8",
-		"etag": "\"13de5-aNjHsKr3YxPKoydI8PiFWSsGjmI\"",
-		"mtime": "2026-09-04T16:56:17.794Z",
-		"size": 81381,
-		"path": "../public/assets/styles-DQibvGOj.css"
-	},
-	"/assets/routes-BxKJJkQr.js": {
+	"/assets/routes-B1S92NZt.js": {
 		"type": "text/javascript; charset=utf-8",
-		"etag": "\"5bdb5-LlftMipsctvCMdMsrmrUHtrTc6k\"",
-		"mtime": "2026-09-04T16:56:17.786Z",
-		"size": 376245,
-		"path": "../public/assets/routes-BxKJJkQr.js"
+		"etag": "\"5c31f-KqeP536BgQ3DCH8ZOmr1d4utd8U\"",
+		"mtime": "2026-09-04T18:25:22.267Z",
+		"size": 377631,
+		"path": "../public/assets/routes-B1S92NZt.js"
 	},
-	"/assets/index-WoTpOns2.js": {
-		"type": "text/javascript; charset=utf-8",
-		"etag": "\"54be3-VtMIkG/2aHsgbeDX/b341jKqZ30\"",
-		"mtime": "2026-09-04T16:56:17.786Z",
-		"size": 347107,
-		"path": "../public/assets/index-WoTpOns2.js"
-	},
-	"/bunny/head.png": {
+	"/left-arm.png": {
 		"type": "image/png",
-		"etag": "\"31765-ke0d2zc741axet8nzcqonMaIYfI\"",
-		"mtime": "2026-09-04T06:18:28.202Z",
-		"size": 202597,
-		"path": "../public/bunny/head.png"
-	},
-	"/bunny/left-leg.png": {
-		"type": "image/png",
-		"etag": "\"a923-DjRCy44QxWAo8jUCmvZ5/RG9e2U\"",
-		"mtime": "2026-09-04T06:18:28.164Z",
-		"size": 43299,
-		"path": "../public/bunny/left-leg.png"
-	},
-	"/bunny/left-ear.png": {
-		"type": "image/png",
-		"etag": "\"1310b-XiR6Avha3ZCLUWAaFu0zd0eb6AY\"",
-		"mtime": "2026-09-04T06:18:28.152Z",
-		"size": 78091,
-		"path": "../public/bunny/left-ear.png"
+		"etag": "\"acde-NjSp/oAVIQyjsKJshj8JK0BnNPU\"",
+		"mtime": "2026-09-04T06:18:28.140Z",
+		"size": 44254,
+		"path": "../public/left-arm.png"
 	},
 	"/bunny/left-arm.png": {
 		"type": "image/png",
@@ -93,12 +65,33 @@ var public_assets_data_default = {
 		"size": 49080,
 		"path": "../public/bunny/left-arm.png"
 	},
+	"/bunny/left-ear.png": {
+		"type": "image/png",
+		"etag": "\"1310b-XiR6Avha3ZCLUWAaFu0zd0eb6AY\"",
+		"mtime": "2026-09-04T06:18:28.152Z",
+		"size": 78091,
+		"path": "../public/bunny/left-ear.png"
+	},
+	"/assets/index-BafwBsd-.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"54be3-quZnGmEnZJtxLxWDoZ0uMro+Hfc\"",
+		"mtime": "2026-09-04T18:25:22.267Z",
+		"size": 347107,
+		"path": "../public/assets/index-BafwBsd-.js"
+	},
 	"/bunny/left-pupil.png": {
 		"type": "image/png",
 		"etag": "\"23fe-68GYur4uCSczWLrnK8z6GGc2jO0\"",
 		"mtime": "2026-09-04T06:18:28.194Z",
 		"size": 9214,
 		"path": "../public/bunny/left-pupil.png"
+	},
+	"/bunny/left-leg.png": {
+		"type": "image/png",
+		"etag": "\"a923-DjRCy44QxWAo8jUCmvZ5/RG9e2U\"",
+		"mtime": "2026-09-04T06:18:28.164Z",
+		"size": 43299,
+		"path": "../public/bunny/left-leg.png"
 	},
 	"/bunny/mouth-open.png": {
 		"type": "image/png",
@@ -114,6 +107,13 @@ var public_assets_data_default = {
 		"size": 91887,
 		"path": "../public/bunny/mouth-mid.png"
 	},
+	"/bunny/head.png": {
+		"type": "image/png",
+		"etag": "\"31765-ke0d2zc741axet8nzcqonMaIYfI\"",
+		"mtime": "2026-09-04T06:18:28.202Z",
+		"size": 202597,
+		"path": "../public/bunny/head.png"
+	},
 	"/bunny/mouth.png": {
 		"type": "image/png",
 		"etag": "\"16339-sCHULWsCO9L5MF3/zriDrmE5QIM\"",
@@ -121,19 +121,19 @@ var public_assets_data_default = {
 		"size": 90937,
 		"path": "../public/bunny/mouth.png"
 	},
-	"/bunny/right-leg.png": {
-		"type": "image/png",
-		"etag": "\"b3a8-UzLGkaOxQJbQX3Tf2EIpIkznpIo\"",
-		"mtime": "2026-09-04T06:18:28.176Z",
-		"size": 45992,
-		"path": "../public/bunny/right-leg.png"
-	},
 	"/bunny/right-arm.png": {
 		"type": "image/png",
 		"etag": "\"c0c3-ZNSaiIYBoe6TRutsU/dLiukeH5U\"",
 		"mtime": "2026-09-04T06:18:28.189Z",
 		"size": 49347,
 		"path": "../public/bunny/right-arm.png"
+	},
+	"/bunny/right-leg.png": {
+		"type": "image/png",
+		"etag": "\"b3a8-UzLGkaOxQJbQX3Tf2EIpIkznpIo\"",
+		"mtime": "2026-09-04T06:18:28.176Z",
+		"size": 45992,
+		"path": "../public/bunny/right-leg.png"
 	},
 	"/bunny/right-pupil.png": {
 		"type": "image/png",
