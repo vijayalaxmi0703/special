@@ -140,7 +140,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   const endedFiredRef = useRef(false);
   const endHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Mirrors `active`/`stage` for the native event listeners, which are
+  /** Mirrors `active` for the native event listeners, which are
       attached exactly once (mount-only) since the <video> element
       itself is persistent for the app's whole lifetime and never
       recreated. */
@@ -148,10 +148,6 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   useEffect(() => {
     activeRef.current = active;
   }, [active]);
-  const stageRef = useRef<Stage>("idle");
-  useEffect(() => {
-    stageRef.current = stage;
-  }, [stage]);
 
   const lastProgressLogRef = useRef(0);
   const lastTimeUpdateLogRef = useRef(0);
@@ -177,23 +173,34 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     });
   };
 
-  /** ITEM 3/4 — always starts MUTED (mobile browsers can reject
-      unmuted autoplay outright; muted autoplay is permitted almost
-      everywhere), and only actually calls `.play()` once the element
-      is genuinely ready. `video.muted`/`video.playsInline` are the
-      only properties this function touches, and it touches them
-      exactly once per playback start — never on a loop, never on a
-      timer. A rejected play() is logged and left alone: the `canplay`/
-      `loadedmetadata` listeners below will naturally retry once the
-      browser reports readiness, and the scene's own pointer handler
-      gives the user a direct, real-gesture way to unmute/resume too. */
-  const startPlayback = () => {
+  /** ITEM 9 — prevents overlapping/duplicate `play()` calls. Set right
+      before `video.play()` is invoked, cleared either by the native
+      `playing` event (the normal, successful path) or by a rejected
+      promise (so a later native event/gesture can try again). Never
+      cleared by a timer. */
+  const playAttemptRef = useRef(false);
+
+  /** ITEMS 2/3/9/12 — the ONLY function in this file that calls
+      `video.play()`. No `readyState` gate anymore: the browser's own
+      native media pipeline is trusted to handle buffering itself once
+      `play()` has been requested — `waiting`/`canplay`/`playing` then
+      reflect its actual state. Safe to call from multiple triggers
+      (the `active` effect, `loadedmetadata`, `canplay`) because it's
+      itself a no-op unless the scene is active, the element exists,
+      no attempt is already in flight, and the video isn't already
+      playing. */
+  const attemptPlay = () => {
     const video = videoRef.current;
     if (!video) return;
+    if (!activeRef.current) return;
+    if (playAttemptRef.current) return; // an attempt is already in flight
+    if (!video.paused) return; // already playing — nothing to do
+
     video.muted = true;
     video.defaultMuted = true;
     video.playsInline = true;
     setIsMuted(true);
+    playAttemptRef.current = true;
     logEvent("play requested");
     video
       .play()
@@ -201,37 +208,28 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
         // Guard against a late resolution racing a since-deactivated
         // scene (e.g. user navigated away via the hidden nav before
         // this promise settled) — never flips stage back to "playing"
-        // for a scene that isn't active anymore.
+        // for a scene that isn't active anymore. The guard itself is
+        // cleared by the native "playing" event (item 10), not here.
         if (!activeRef.current) return;
         logEvent("play success");
       })
       .catch((err) => {
         // A rejected play() must NEVER finish or skip the scene — it's
-        // logged and left alone. The `canplay`/`playing` listeners will
-        // naturally retry once the browser reports readiness, and the
-        // dedicated unmute button gives the user a direct, real-gesture
-        // way to resume too.
+        // logged and left alone. Clearing the guard here (not just on
+        // "playing") lets the next native readiness event or a real
+        // user gesture make a fresh attempt instead of being locked
+        // out by a stale in-flight flag.
+        playAttemptRef.current = false;
         logEvent("play blocked", { err: String(err) });
       });
   };
 
-  /** Only actually starts playback once the element has reported
-      enough readiness — see item 4. `HAVE_FUTURE_DATA` (readyState 3)
-      is the same bar the native `canplay` event itself fires at. */
-  const tryStartIfReady = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.readyState >= 3) {
-      startPlayback();
-    }
-    // Otherwise: do nothing here. The `loadedmetadata`/`canplay`
-    // listeners below will call tryStartIfReady() again the moment the
-    // browser itself reports readiness — no polling, no timer.
-  };
-
   /* Drives playback purely off the `active` prop — never off mount,
      never off a timer. This is the ONLY place that starts or stops
-     playback in response to the story reaching/leaving this scene. */
+     playback in response to the story reaching/leaving this scene.
+     ITEM 3: attempts muted playback the instant `active` becomes true
+     — does NOT wait for `loadedmetadata`/`canplay` first. The browser
+     handles buffering natively from here. */
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -241,9 +239,10 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
       completedRef.current = false;
       endedFiredRef.current = false;
       setStage((s) => (s === "idle" ? "loading" : s));
-      tryStartIfReady();
+      attemptPlay();
     } else {
       video.pause();
+      playAttemptRef.current = false;
       setStage("idle");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -258,21 +257,35 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
 
     const handleLoadedMetadata = () => {
       logEvent("loadedmetadata");
-      if (activeRef.current && stageRef.current === "loading") tryStartIfReady();
+      // Fallback retry only: the real attempt already happened the
+      // instant `active` became true (see the effect above). This just
+      // catches the case where that first attempt was rejected (e.g.
+      // the element hadn't accepted a gesture-based play yet) and the
+      // element has since made progress — attemptPlay() itself is a
+      // no-op if an attempt is already in flight or playback is
+      // already underway.
+      if (activeRef.current) attemptPlay();
     };
 
     const handleCanPlay = () => {
       logEvent("canplay");
-      if (
-        activeRef.current &&
-        (stageRef.current === "loading" || stageRef.current === "buffering")
-      ) {
-        tryStartIfReady();
+      // ITEM 12 — one controlled attempt, only if the scene is active
+      // and the video is genuinely paused. attemptPlay() itself already
+      // enforces "don't call play() if already playing" and "don't
+      // overlap with an in-flight attempt", so this is safe to call
+      // unconditionally on every canplay without risking a duplicate
+      // play() call.
+      if (activeRef.current && video.paused) {
+        attemptPlay();
       }
     };
 
     const handlePlaying = () => {
       logEvent("playing", { currentTime: video.currentTime });
+      // ITEM 10 — the native "playing" event is the authoritative
+      // signal that a play attempt has genuinely succeeded; this is
+      // where the in-flight guard is cleared.
+      playAttemptRef.current = false;
       setStage("playing");
     };
 
@@ -525,7 +538,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
           src="/video/memory.mp4"
           playsInline
           muted={isMuted}
-          preload="metadata"
+          preload="auto"
           controls={false}
           className="block w-full"
           style={{ objectFit: "contain", maxHeight: `${frameMaxHVh}vh` }}
