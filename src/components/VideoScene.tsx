@@ -138,15 +138,35 @@ type Props = {
   frameMaxHVh?: number;
   /** Frame's margin from the screen's bottom edge, in vh. */
   frameBottomVh?: number;
+  /** LOADING STRATEGY FIX (root cause of "video doesn't reliably
+      appear/play" + general mobile lag around the video scene): this
+      used to be `preload="auto"` from the moment the app mounted,
+      which tells the browser to start pulling the full ~7MB memory.mp4
+      down immediately — competing with the very first scenes (and the
+      two background/hug <audio> tracks) for the same limited mobile
+      bandwidth/CPU/decoder budget, while the video itself is minutes
+      away from ever being shown.
+
+      This prop is App.tsx's signal that the video phase is coming up
+      soon (see App.tsx's VIDEO_PRELOAD_PHASES) — only THEN does this
+      component upgrade from `preload="metadata"` (cheap: duration/
+      dimensions only, no real download) to `preload="auto"` and kick
+      off the real buffering, giving it a real head start before the
+      scene is reached without ever competing with the opening scenes.
+      `active` itself is also treated as "start loading now" so a
+      direct jump into the video phase (e.g. via the hidden nav) still
+      works correctly — it just won't have had the same head start. */
+  preloadActive?: boolean;
 };
 
 const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
-  { active, onComplete, onEnded, frameMaxHVh = 75, frameBottomVh = 3 },
+  { active, onComplete, onEnded, frameMaxHVh = 75, frameBottomVh = 3, preloadActive = false },
   ref,
 ) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [needsUnmute, setNeedsUnmute] = useState(false);
+  const [preloadMode, setPreloadMode] = useState<"none" | "metadata" | "auto">("metadata");
 
   const completedRef = useRef(false);
   const endedFiredRef = useRef(false);
@@ -191,6 +211,20 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   /** True while the pause is one the user asked for (via tap), so the
       watchdog never mistakes an intentional pause for a stall. */
   const userPausedRef = useRef(false);
+
+  /* LOADING STRATEGY FIX: upgrade from a cheap metadata-only preload to
+     the real buffering the moment either (a) App.tsx signals the video
+     phase is coming up soon, or (b) the scene actually becomes active
+     (covers a direct jump straight into it). `.load()` is what makes
+     the browser re-evaluate the just-changed `preload` attribute — a
+     plain attribute change alone doesn't retroactively affect an
+     already-created media resource fetch. */
+  useEffect(() => {
+    if (!(preloadActive || active) || preloadMode === "auto") return;
+    setPreloadMode("auto");
+    const video = videoRef.current;
+    if (video) video.load();
+  }, [preloadActive, active, preloadMode]);
 
   const clearWatchdogs = () => {
     if (watchdogIntervalRef.current) {
@@ -380,11 +414,12 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     };
 
     /** ROOT CAUSE OF "video scene skipped on mobile": this element has
-        had `src="/video/memory.mp4"` and `preload="auto"` set since
-        mount (so the browser starts fetching/buffering the 9MB memory
-        clip in the background, long before the video scene is ever
-        reached — which is exactly what we want for preloading). But
-        this `error` listener is attached ONCE for the component's
+        had `src="/video/memory.mp4"` set since mount, and upgrades
+        from a cheap `preload="metadata"` to a real `preload="auto"`
+        buffer once the video phase is coming up soon (see the
+        `preloadActive` prop/effect above) — well before the scene is
+        actually reached. But this `error` listener is attached ONCE
+        for the component's
         entire lifetime and, until this fix, reacted to ANY `error`
         event by immediately calling `finish()` — which flips
         `videoReleased` in App.tsx permanently true.
@@ -643,7 +678,7 @@ const handleSceneTap = (e: React.MouseEvent) => {
             ref={videoRef}
             src="/video/memory.mp4"
             playsInline
-            preload="auto"
+            preload={preloadMode}
             className="block w-full"
             style={{ objectFit: "contain", maxHeight: `${frameMaxHVh}vh` }}
           />

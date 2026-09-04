@@ -248,6 +248,26 @@ const VIDEO_SEGMENT = TIMELINE.find((s) => s.phase === "video")!;
 
 const INTRO_PHASES: readonly Phase[] = ["introHidden", "introPeek", "introWave", "introGreeting"];
 
+/** LOADING STRATEGY (see VideoScene.tsx's `preloadActive` prop note):
+    the phases from "preCrown" through "video" itself — i.e. from
+    shortly before the crown sequence begins all the way up to the
+    memory clip actually playing. That's a comfortable ~20-30s head
+    start (crown pickup + fly + the "wait, there's something..."
+    transition lines) for the real video buffering to happen in the
+    background, without it ever competing with bandwidth/CPU during
+    the opening greeting/talk/question scenes. */
+const VIDEO_PRELOAD_PHASES = new Set<Phase>([
+  "preCrown",
+  "noticeCrown",
+  "walkToCrown",
+  "grabCrown",
+  "backToViewer",
+  "raiseCrown",
+  "crownFly",
+  "videoTransition",
+  "video",
+]);
+
 const introPhaseFor = (p: Phase): IntroPhase | undefined => {
   switch (p) {
     case "introHidden":
@@ -507,7 +527,43 @@ async function primeTrack(audio: HTMLAudioElement, isStillInactive: () => boolea
 }
 
 export default function App() {
-  const [elapsed, setElapsed] = useState(0);
+  /* ARCHITECTURE FIX (root cause of general mobile lag): `elapsed`
+     used to be React state, updated by setState() on every single rAF
+     tick (~60x/sec) — see the old "ONE clock" effect below. Every one
+     of those updates re-rendered the ENTIRE App tree (Bunny, Scenery,
+     QuestionCard, VideoScene, every motion.div) even though the vast
+     majority of frames don't actually change anything visible: most of
+     the time only the sub-millisecond position within the *current*
+     line/phase changes, not the line or phase itself.
+
+     `elapsed` now lives in a ref (`elapsedRef`) that the rAF loop
+     mutates directly, with NO setState involved. `resolved` — the
+     actual React state — only holds the *derived*, low-frequency
+     {phase, lineIndex} pair, and is only updated (via `applyElapsed`)
+     when that pair actually changes, which is naturally rare: once per
+     spoken line (every ~2.5–9s) or once per phase transition, instead
+     of every ~16ms. That's the entire fix: same timeline, same
+     accuracy (elapsedRef is still ticked with real measured dt every
+     frame), but a render cadence driven by the STORY instead of the
+     display's refresh rate. */
+  const elapsedRef = useRef(0);
+  const resolvedRef = useRef<ResolvedState>(resolveTimeline(0));
+  const [resolved, setResolved] = useState<ResolvedState>(resolvedRef.current);
+
+  /** The only way `elapsed` should ever be changed, from anywhere in
+      this component (the rAF tick, skip/nudge/replay). Keeps
+      elapsedRef, resolvedRef, and React state in lockstep, and only
+      ever triggers a re-render when phase or lineIndex actually
+      differ from what's currently on screen. */
+  const applyElapsed = (next: number) => {
+    elapsedRef.current = next;
+    const r = resolveTimeline(next);
+    if (r.phase !== resolvedRef.current.phase || r.lineIndex !== resolvedRef.current.lineIndex) {
+      resolvedRef.current = r;
+      setResolved(r);
+    }
+  };
+
   /* Mic defaults ON (music allowed) — actual audible start still
      requires a browser-permitted play(), handled by FIX 3 above. */
   const [muted, setMuted] = useState(false);
@@ -736,14 +792,17 @@ export default function App() {
     gateRef.current = gateMs;
   }, [gateMs]);
 
-  /* The ONE clock. */
+  /* The ONE clock. Mutates elapsedRef directly every frame (real,
+     measured dt, so timeline accuracy/pacing is unchanged) and only
+     ever touches React state via applyElapsed's own internal
+     phase/lineIndex comparison — see the comment on elapsedRef above. */
   useEffect(() => {
     let raf: number;
     let last = performance.now();
     const tick = (now: number) => {
       const dt = now - last;
       last = now;
-      setElapsed((e) => Math.min(gateRef.current, e + dt));
+      applyElapsed(Math.min(gateRef.current, elapsedRef.current + dt));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -751,7 +810,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
 
-  const { phase, lineIndex } = useMemo(() => resolveTimeline(elapsed), [elapsed]);
+  const { phase, lineIndex } = resolved;
 
   /* VIDEO SCENE: keep videoActiveRef in sync with the resolved phase,
      and reset videoAudioDone the moment "video" is (re-)entered — e.g.
@@ -1007,23 +1066,23 @@ export default function App() {
       return;
     }
     if (isIntro) {
-      setElapsed(TIMELINE.find((s) => s.phase === "introEnter")!.start);
+      applyElapsed(TIMELINE.find((s) => s.phase === "introEnter")!.start);
       return;
     }
     if (phase === "introEnter") {
-      setElapsed(TIMELINE.find((s) => s.phase === "talk")!.start);
+      applyElapsed(TIMELINE.find((s) => s.phase === "talk")!.start);
       return;
     }
     const pl = PHASE_LINES[phase];
     if (pl) {
       const seg = TIMELINE.find((s) => s.phase === phase)!;
       const nextLineStart = seg.start + pl.lines[lineIndex]!.end;
-      setElapsed(Math.min(gateMs, nextLineStart));
+      applyElapsed(Math.min(gateMs, nextLineStart));
     }
   };
 
   const replay = () => {
-    setElapsed(0);
+    applyElapsed(0);
     setAnswered(false);
     setVideoReleased(false);
     setVideoAudioDone(false);
@@ -1044,7 +1103,7 @@ export default function App() {
     const isDoubleTap = lastTapRef.current.side === side && now - lastTapRef.current.time < DOUBLE_TAP_WINDOW_MS;
     lastTapRef.current = { side, time: now };
     const amount = isDoubleTap ? NAV_DOUBLE_TAP_JUMP_MS : NAV_JUMP_MS;
-    setElapsed((e) => Math.max(0, Math.min(gateMs, e + direction * amount)));
+    applyElapsed(Math.max(0, Math.min(gateMs, elapsedRef.current + direction * amount)));
   };
 
   const handleYes = () => {
@@ -1156,7 +1215,6 @@ export default function App() {
                 pose={pose}
                 look={isVideoScene ? videoGlance : look}
                 talking={talking}
-                talkClockMs={elapsed}
                 walking={walking}
                 smiling={smiling}
                 holdingCrown={holdingCrown}
@@ -1226,6 +1284,7 @@ export default function App() {
         active={phase === "video"}
         frameMaxHVh={VIDEO_FRAME_MAX_H_VH}
         frameBottomVh={VIDEO_FRAME_BOTTOM_VH}
+        preloadActive={VIDEO_PRELOAD_PHASES.has(phase)}
         onEnded={() => setVideoAudioDone(true)}
         onComplete={() => setVideoReleased(true)}
       />
