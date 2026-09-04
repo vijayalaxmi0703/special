@@ -164,7 +164,10 @@ if (typeof window !== "undefined") {
 
   const scheduleIdle: (cb: () => void) => void =
     "requestIdleCallback" in window
-      ? (cb) => (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(cb)
+      ? (cb) =>
+          (
+            window as unknown as { requestIdleCallback: (cb: () => void) => void }
+          ).requestIdleCallback(cb)
       : (cb) => window.setTimeout(cb, 1500);
   scheduleIdle(() => preloadImages([CROWN_ASSET]));
 }
@@ -278,7 +281,12 @@ const Slot = ({
 );
 
 const Img = ({ src, alt = "" }: { src: string; alt?: string }) => (
-  <img src={src} alt={alt} className="pointer-events-none block w-full select-none" draggable={false} />
+  <img
+    src={src}
+    alt={alt}
+    className="pointer-events-none block w-full select-none"
+    draggable={false}
+  />
 );
 
 const ArmPivot = ({
@@ -463,7 +471,13 @@ function BunnyImpl({
           ? { x: 0, y: 0, scale: 1.08, rotate: 0, opacity: 1 }
           : { x: 190, y: 0, scale: 0.82, rotate: 0, opacity: 1 };
       case "approach":
-        return { x: 0, y: [0, 6, 14, 24] as number[], scale: [1, 1.15, 1.4, 1.65] as number[], rotate: 0, opacity: 1 };
+        return {
+          x: 0,
+          y: [0, 6, 14, 24] as number[],
+          scale: [1, 1.15, 1.4, 1.65] as number[],
+          rotate: 0,
+          opacity: 1,
+        };
       case "hug":
         return { x: 0, y: 44, scale: 1.75, rotate: 0, opacity: 1 };
       case "release":
@@ -497,7 +511,15 @@ function BunnyImpl({
   };
 
   const headTilt =
-    pose === "shy" ? -8 : pose === "curious" ? 9 : pose === "surprised" ? -4 : pose === "wave" ? 5 : gaze.head * 0.6;
+    pose === "shy"
+      ? -8
+      : pose === "curious"
+        ? 9
+        : pose === "surprised"
+          ? -4
+          : pose === "wave"
+            ? 5
+            : gaze.head * 0.6;
   const headAnim = {
     rotate: [headTilt - 1.2, headTilt + 1.2, headTilt - 1.2],
     y: pose === "shy" ? 8 : pose === "surprised" ? -6 : 0,
@@ -505,7 +527,11 @@ function BunnyImpl({
   };
 
   const earSwing = walking ? 7 : isHug ? 3 : 4;
-  const earTransition: Transition = { duration: walking ? 0.78 : 4.2, repeat: Infinity, ease: "easeInOut" };
+  const earTransition: Transition = {
+    duration: walking ? 0.78 : 4.2,
+    repeat: Infinity,
+    ease: "easeInOut",
+  };
 
   /* holdFrame: a purpose-built pose for the (large, scaled/clipped-in
      App.tsx) video scene — see the VIDEO SCENE NOTE at the top of this
@@ -518,7 +544,8 @@ function BunnyImpl({
      crossing over the centerline the way a tighter "grip" rotation
      would. */
   const armLeft = (() => {
-    if (isHug) return { rotate: [2, 22, 44, 64] as number[], scale: [1, 1.05, 1.09, 1.11] as number[] };
+    if (isHug)
+      return { rotate: [2, 22, 44, 64] as number[], scale: [1, 1.05, 1.09, 1.11] as number[] };
     if (isApproach) return { rotate: [-6, -30, -58] as number[], scale: 1 };
     if (isRaise) return { rotate: 100, scale: 1.04 };
     if (isHold) return { rotate: 56, scale: 1.4 };
@@ -532,7 +559,8 @@ function BunnyImpl({
   })();
 
   const armRight = (() => {
-    if (isHug) return { rotate: [-2, -22, -44, -64] as number[], scale: [1, 1.05, 1.09, 1.11] as number[] };
+    if (isHug)
+      return { rotate: [-2, -22, -44, -64] as number[], scale: [1, 1.05, 1.09, 1.11] as number[] };
     if (isApproach) return { rotate: [6, 30, 58] as number[], scale: 1 };
     if (isRaise) return { rotate: -100, scale: 1.04 };
     if (isHold) return { rotate: -56, scale: 1.4 };
@@ -557,10 +585,10 @@ function BunnyImpl({
       : isApproach
         ? { duration: 3.2, ease: "easeInOut" }
         : {
-          duration: pose === "wave" ? 0.6 : walking ? 0.78 : 4,
-          repeat: Infinity,
-          ease: "easeInOut",
-        };
+            duration: pose === "wave" ? 0.6 : walking ? 0.78 : 4,
+            repeat: Infinity,
+            ease: "easeInOut",
+          };
 
   const legTransition: Transition = { duration: 0.78, repeat: Infinity, ease: "easeInOut" };
   const legIdleTransition: Transition = { duration: 4.6, repeat: Infinity, ease: "easeInOut" };
@@ -574,7 +602,11 @@ function BunnyImpl({
     <motion.div
       className="relative"
       style={{ width: STAGE_W, height: STAGE_H, transformOrigin: "50% 100%" }}
-      initial={walkInFrom ? { x: walkInFrom.x, y: walkInFrom.y, scale: 1, rotate: walkInFrom.rotate, opacity: 1 } : false}
+      initial={
+        walkInFrom
+          ? { x: walkInFrom.x, y: walkInFrom.y, scale: 1, rotate: walkInFrom.rotate, opacity: 1 }
+          : false
+      }
       animate={rootAnim}
       transition={rootTransition}
     >
@@ -610,10 +642,20 @@ function BunnyImpl({
           <Img src="/bunny/body.png" alt="A soft white plush bunny" />
         </Slot>
 
-        <Slot p={P.leftLeg} origin="50% 8%" animate={legL} transition={{ rotate: walking ? legTransition : legIdleTransition }}>
+        <Slot
+          p={P.leftLeg}
+          origin="50% 8%"
+          animate={legL}
+          transition={{ rotate: walking ? legTransition : legIdleTransition }}
+        >
           <Img src="/bunny/left-leg.png" />
         </Slot>
-        <Slot p={P.rightLeg} origin="50% 8%" animate={legR} transition={{ rotate: walking ? legTransition : legIdleTransition }}>
+        <Slot
+          p={P.rightLeg}
+          origin="50% 8%"
+          animate={legR}
+          transition={{ rotate: walking ? legTransition : legIdleTransition }}
+        >
           <Img src="/bunny/right-leg.png" />
         </Slot>
 
@@ -643,9 +685,17 @@ function BunnyImpl({
           className="absolute inset-0"
           style={{ transformOrigin: "50% 60%", zIndex: 5 }}
           animate={headAnim}
-          transition={{ rotate: { duration: 4.6, repeat: Infinity, ease: "easeInOut" }, default: spring }}
+          transition={{
+            rotate: { duration: 4.6, repeat: Infinity, ease: "easeInOut" },
+            default: spring,
+          }}
         >
-          <Slot p={P.head} origin="50% 80%" animate={{ scale: [1, 1.006, 1] }} transition={legIdleTransition}>
+          <Slot
+            p={P.head}
+            origin="50% 80%"
+            animate={{ scale: [1, 1.006, 1] }}
+            transition={legIdleTransition}
+          >
             <Img src="/bunny/head.png" />
           </Slot>
           <Slot p={P.leftPupil} origin="50% 50%" animate={pupil} transition={pupilTransition}>

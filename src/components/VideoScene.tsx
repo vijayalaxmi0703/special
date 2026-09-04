@@ -1,136 +1,104 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { VolumeX } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { VolumeX } from "lucide-react";
 
 /**
- * VideoScene — "a special memory is being revealed."
+ * VideoScene — ARCHITECTURE REWRITE (this round).
  *
- * ROOT-CAUSE AUDIO FIX (this round):
+ * Previous rounds kept patching a watchdog/retry system layered on top
+ * of a video element that was still entangled with React state,
+ * Framer Motion, animated particles, and arbitrary timers (6s/12s/30s
+ * strike counters). That combination was still fragile on real mobile
+ * hardware — the report was that it can still stop/freeze on mobile.
  *
- * Previously this component (and its <video> element) was only mounted
- * while `phase === "video"` (App.tsx wrapped it in
- * `<AnimatePresence>{phase === "video" && <VideoScene/>}</AnimatePresence>`).
- * That meant a BRAND NEW <video> DOM node was created every time the
- * scene was entered, and `video.play()` was first called from inside a
- * `useEffect` — i.e. NOT synchronously inside a user gesture's call
- * stack. Browsers only allow unmuted autoplay either (a) inside the
- * exact call stack of a user gesture, or (b) on a specific
- * HTMLMediaElement that has previously been granted a "user gesture"
- * play on THAT SAME element. Because the element was destroyed and
- * recreated every time, condition (b) could never be satisfied, and
- * condition (a) didn't hold either (the phase change comes from a raf
- * timeline / gate, not directly from the click handler) — so unmuted
- * play() was reliably rejected, silently falling back to the muted
- * branch. That's the actual root cause of "video plays but no audio."
+ * This round is a genuine redesign, not another patch: the video is
+ * now a self-contained native media player, deliberately decoupled
+ * from everything else in the app.
  *
- * The fix: this component is now ALWAYS mounted by App.tsx (never
- * conditionally unmounted), and visibility/interactivity is controlled
- * purely by the `active` prop (true while `phase === "video"`). That
- * means there is exactly ONE <video> element for the entire lifetime of
- * the app. App.tsx's existing first-gesture / "FIX 3" gesture-linked
- * flow (the same mechanism that already unlocks the background/hug
- * <audio> tracks) now ALSO calls `prime()` (exposed below via
- * `useImperativeHandle`) on every such gesture. `prime()` does a
- * silent (volume 0) play()+pause() cycle on this exact <video> element.
- * Because that first successful play() happens inside a real user
- * gesture, the browser marks THIS element as having gesture-based
- * playback history — so later, when `active` flips true (no gesture
- * required at that moment), the real `video.play()` with
- * `muted = false` is allowed to proceed with sound, because it's the
- * same DOM node that was already gesture-activated earlier. No
- * additional mute/unmute button was added; the existing "tap for
- * sound" fallback stays only as a last-resort safety net for browsers
- * that don't honor the priming (it should now rarely if ever appear).
+ * WHY THE OLD DESIGN COULD STILL FAIL ON MOBILE (root cause):
  *
- * Lifecycle (driven by the `active` prop instead of mount/unmount):
- *   idle -(active becomes true)-> entering -> playing -> holding (1.5s
- *   after `ended`) -> fading (900ms) -> done -(active becomes false)-> idle
+ *   1. It used a strike-based watchdog polling `currentTime` every 3s
+ *      and forcing the scene to "finish" after a fixed number of
+ *      stalled checks, or an unconditional 30s ceiling regardless of
+ *      cause. A perfectly recoverable mobile buffering pause (common
+ *      on cellular networks, and especially common right after a
+ *      background tab regains focus) could get force-skipped by a
+ *      timer that had no actual knowledge of whether the video was
+ *      about to resume on its own.
+ *   2. It called `video.load()` as part of that retry path — which
+ *      resets the whole media pipeline (decoder, buffer, network
+ *      request) — precisely while playback was already struggling,
+ *      making a temporary stall *more* likely to turn into a real
+ *      failure instead of less.
+ *   3. Framer Motion `animate={{ opacity, scale }}` was applied to the
+ *      frame wrapping the live <video> element every render, plus 14
+ *      continuously-animated particle spans and a pulsing blurred glow
+ *      layered on top — all fighting the mobile GPU/decoder for the
+ *      same frame budget as the video decode itself, right when the
+ *      device needs every spare cycle for smooth playback.
+ *   4. Multiple pointer/touch handlers (`onPointerEnter`,
+ *      `onPointerDown`, a separate frame `onClick`, plus the app's own
+ *      global tap-to-advance handler) all had some path to touching
+ *      playback, which is exactly the kind of overlapping-handler mess
+ *      that produces inconsistent mobile behavior.
  *
- * `onEnded` fires the instant the video's native `ended` event fires —
- * App.tsx uses that (not a timer, and not `onComplete`) to resume the
- * background music exactly when the memory's own audio actually stops.
- * `onComplete` fires later, after the hold+fade beat, and is what
- * App.tsx uses to lift the `videoReleased` gate so the virtual timeline
- * continues into Final Affirmation.
+ * WHAT'S DIFFERENT NOW:
  *
- * Exposed imperative handle (used by App.tsx):
- *   - prime(): silent gesture-linked unlock, see above. Safe to call on
- *     every gesture; a no-op after the first successful call.
- *   - togglePauseResume(): pauses/resumes the ACTUAL <video> element.
- *     Used by App.tsx's existing tap-to-advance ("skip") handler so that
- *     clicking the middle of the screen during the video scene pauses/
- *     resumes playback instead of doing nothing.
- *   - reset(): used by App.tsx's replay() so a fresh run starts the
- *     memory from the beginning instead of wherever a previous run left
- *     off.
+ *   - No watchdog, no strike counter, no 6s/12s/30s timers anywhere in
+ *     this file. Playback progress is judged ONLY by real native
+ *     media events (`playing`, `waiting`, `stalled`, `progress`,
+ *     `timeupdate`, `canplay`, `ended`, `error`) — never by polling,
+ *     never by a clock.
+ *   - `video.load()` is called in exactly one place: `reset()`, used
+ *     only by Replay. It is never called as part of normal playback,
+ *     buffering recovery, or error handling.
+ *   - `currentTime`/`playbackRate`/`volume`/`muted` are each set once,
+ *     at the moments described in the numbered items below — never
+ *     continuously reassigned while the video plays.
+ *   - The frame is a plain element with a CSS `transition: opacity`
+ *     for entering/exiting. No Framer Motion anywhere in this file, no
+ *     particles, no animated glow, no backdrop-blur, no animated
+ *     shadow — the video gets the mobile GPU/decoder's full budget.
+ *   - Exactly ONE pointer handler drives all in-scene interaction (see
+ *     `handlePointerDown` below): the wrapper's own `onPointerDown`.
+ *     Nothing else in this file, and nothing in App.tsx, reaches into
+ *     playback control anymore.
+ *   - `onComplete()` (which lifts App.tsx's `videoReleased` gate and
+ *     lets the story continue) is called from exactly two places: the
+ *     native `ended` event, or a genuinely permanent media error (see
+ *     item 6/`isPermanentError` below) — never from buffering, never
+ *     from a play() rejection, never from a timer.
+ *   - React's own timeline is already frozen for the duration of this
+ *     scene by App.tsx's existing `videoReleased` gate (the "video"
+ *     segment's gate caps `elapsed` right at the segment's start until
+ *     this component calls `onComplete()`) — this file doesn't need to
+ *     do anything extra to "pause" the timeline, it only needs to
+ *     never call `onComplete()` prematurely.
+ *
+ * DEBUG LOGGING (item 15): every native media event below logs
+ * currentTime/duration/readyState/networkState/paused/muted/error —
+ * enough to tell apart autoplay-policy rejections, buffering/network
+ * stalls, decode errors, and (via the absence of expected logs) a
+ * frozen main thread. `progress`/`timeupdate` are throttled to ~1/sec
+ * so the logging itself can't become a mobile perf problem.
  */
 
-type Stage = "idle" | "entering" | "playing" | "holding" | "fading" | "done";
-
-const HOLD_MS = 1500;
-const FADE_MS = 900;
-
-/**
- * WATCHDOG (mobile hard-stop fix): this is the piece that was actually
- * missing before. `ended` and `error` are the only two events this
- * component reacted to — but on a real mobile device it's entirely
- * possible for neither to ever fire: `video.play()` returns a promise
- * that only settles once playback genuinely starts, and on a slow/
- * flaky mobile connection (or when the browser silently deprioritizes
- * an off-screen/backgrounded media element's buffering, or throttles a
- * page running 2 <audio> + 1 <video> at once) that promise can just
- * hang — neither resolving nor rejecting — while `preload="auto"`
- * quietly keeps trying to buffer. No `error` event fires (nothing
- * actually failed), so `handleError` never runs; no `ended` event fires
- * (playback never started), so `handleEnded` never runs either. Result:
- * `stage` sits in "entering" forever, `finish()` is never called,
- * `onComplete` never fires, and App.tsx's `videoReleased` gate — which
- * caps `elapsed` at the video segment until that gate lifts — holds the
- * ENTIRE timeline there permanently. That is the exact reported bug:
- * everything before VideoScene is fine, VideoScene starts, and nothing
- * after it ever plays.
- *
- * The fix is a small watchdog, independent of any single video event:
- * every STALL_CHECK_MS while the scene is active and not already
- * resolved, check whether `video.currentTime` has actually advanced
- * since the last check (and whether the element is still paused when
- * it shouldn't be). No progress for STALL_STRIKES_TO_RETRY checks in a
- * row -> one reload+replay attempt (same one-shot retry `handleError`
- * already used for genuine mid-scene errors, just reached by a
- * different trigger). Still no progress after that -> `finish()`, the
- * same graceful "skip the scene" used everywhere else, which lifts the
- * gate exactly once (guarded by `completedRef`, so this can never
- * double-advance the timeline even if `ended`/`error` also fire around
- * the same time). On top of the strike-based check, HARD_TIMEOUT_MS is
- * an unconditional ceiling from the moment the scene becomes active —
- * regardless of stage, retries, or any other state, the scene is
- * force-finished once this elapses, so there is no code path left that
- * can hold the timeline at VideoScene forever.
- *
- * A user-initiated pause (via the existing tap-to-pause/resume) must
- * never be mistaken for a stall — `userPausedRef` suspends stall
- * counting while true.
- */
-const STALL_CHECK_MS = 3000;
-const STALL_STRIKES_TO_RETRY = 2; // ~6s of no progress before the one-shot reload+retry
-const STALL_STRIKES_TO_FINISH = 4; // ~12s of no progress (including the retry) before giving up gracefully
-const HARD_TIMEOUT_MS = 30000; // absolute ceiling — the scene is force-finished no matter what by this point
+type Stage = "idle" | "loading" | "ready" | "playing" | "buffering" | "ended" | "error";
 
 export type VideoSceneHandle = {
-  prime: () => void;
-  togglePauseResume: () => void;
+  /** Used only by App.tsx's replay(). The one place `.load()` is
+      allowed to run outside first mount. */
   reset: () => void;
 };
 
 type Props = {
-  /** True exactly while `phase === "video"`. Drives playback start/stop
-      and visibility — this component is otherwise always mounted. */
+  /** True exactly while `phase === "video"`. This is the only signal
+      this component reacts to for starting/stopping playback. */
   active: boolean;
   onComplete: () => void;
   /** Fires the instant the video's native `ended` event fires — before
-      the hold/fade beat below. App.tsx uses this (not a timer) to
-      resume background music exactly when the memory's own audio
-      actually stops. */
+      the hold beat below. App.tsx uses this (not a timer) to resume
+      background music exactly when the memory's own audio actually
+      stops. */
   onEnded?: () => void;
   /** Frame's own max-height, in vh — passed down from App.tsx so the
       frame's actual on-screen size always matches the geometry the
@@ -138,347 +106,277 @@ type Props = {
   frameMaxHVh?: number;
   /** Frame's margin from the screen's bottom edge, in vh. */
   frameBottomVh?: number;
-  /** LOADING STRATEGY FIX (root cause of "video doesn't reliably
-      appear/play" + general mobile lag around the video scene): this
-      used to be `preload="auto"` from the moment the app mounted,
-      which tells the browser to start pulling the full ~7MB memory.mp4
-      down immediately — competing with the very first scenes (and the
-      two background/hug <audio> tracks) for the same limited mobile
-      bandwidth/CPU/decoder budget, while the video itself is minutes
-      away from ever being shown.
-
-      This prop is App.tsx's signal that the video phase is coming up
-      soon (see App.tsx's VIDEO_PRELOAD_PHASES) — only THEN does this
-      component upgrade from `preload="metadata"` (cheap: duration/
-      dimensions only, no real download) to `preload="auto"` and kick
-      off the real buffering, giving it a real head start before the
-      scene is reached without ever competing with the opening scenes.
-      `active` itself is also treated as "start loading now" so a
-      direct jump into the video phase (e.g. via the hidden nav) still
-      works correctly — it just won't have had the same head start. */
-  preloadActive?: boolean;
 };
 
+/** How long the scene holds on the final frame after `ended` before
+    calling onComplete — a deliberate, short visual beat, NOT a
+    playback-progress mechanism. Native `ended` has already fired by
+    the time this runs; this timer only ever delays onComplete, it can
+    never bring it forward or substitute for a real event. */
+const END_HOLD_MS = 900;
+
+/** Throttle window for the very-high-frequency `progress`/`timeupdate`
+    debug logs, so the logging itself never becomes a mobile perf cost. */
+const LOG_THROTTLE_MS = 1000;
+
 const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
-  { active, onComplete, onEnded, frameMaxHVh = 75, frameBottomVh = 3, preloadActive = false },
+  { active, onComplete, onEnded, frameMaxHVh = 75, frameBottomVh = 3 },
   ref,
 ) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
-  const [needsUnmute, setNeedsUnmute] = useState(false);
-  const [preloadMode, setPreloadMode] = useState<"none" | "metadata" | "auto">("metadata");
+  const [isMuted, setIsMuted] = useState(true);
 
   const completedRef = useRef(false);
   const endedFiredRef = useRef(false);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Bumped every time `active` becomes true; async play() attempts
-      check this so a rapid active->inactive->active cycle can never
-      apply a stale attempt's result. */
-  const runTokenRef = useRef(0);
-  /** Mirrors `active` for the native ended/error listeners, which are
-      attached once (mount-only) since the element itself never
-      unmounts anymore. */
+  const endHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Mirrors `active`/`stage` for the native event listeners, which are
+      attached exactly once (mount-only) since the <video> element
+      itself is persistent for the app's whole lifetime and never
+      recreated. */
   const activeRef = useRef(active);
   useEffect(() => {
     activeRef.current = active;
   }, [active]);
-  /** Live mirror of `stage`, read by the watchdog's setInterval callback
-      below — that interval is created once per `active` transition (the
-      effect only depends on `active`), so closing over `stage` directly
-      would freeze it at whatever value it held at that moment instead of
-      tracking later stage changes. */
   const stageRef = useRef<Stage>("idle");
   useEffect(() => {
     stageRef.current = stage;
   }, [stage]);
-  /** True once a silent, gesture-linked play()+pause() has actually
-      succeeded on this element — see `prime()` below. */
-  const primedRef = useRef(false);
-  /** Guards the one-shot retry-on-error below so a genuinely broken
-      video can still fall through to finish() rather than retrying
-      forever. Reset every time `active` newly becomes true. Shared
-      between `handleError` and the watchdog below — only one reload
-      attempt is ever made per scene entry, regardless of which one
-      triggers it. */
-  const retriedRef = useRef(false);
 
-  /* WATCHDOG state — see the block comment above STALL_CHECK_MS. */
-  const watchdogIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastCurrentTimeRef = useRef(0);
-  const stallStrikesRef = useRef(0);
-  /** True while the pause is one the user asked for (via tap), so the
-      watchdog never mistakes an intentional pause for a stall. */
-  const userPausedRef = useRef(false);
+  const lastProgressLogRef = useRef(0);
+  const lastTimeUpdateLogRef = useRef(0);
 
-  /* LOADING STRATEGY FIX: upgrade from a cheap metadata-only preload to
-     the real buffering the moment either (a) App.tsx signals the video
-     phase is coming up soon, or (b) the scene actually becomes active
-     (covers a direct jump straight into it). `.load()` is what makes
-     the browser re-evaluate the just-changed `preload` attribute — a
-     plain attribute change alone doesn't retroactively affect an
-     already-created media resource fetch. */
-  useEffect(() => {
-    if (!(preloadActive || active) || preloadMode === "auto") return;
-    setPreloadMode("auto");
+  /** ITEM 15 — DEBUG LOGGING: every call logs the full diagnostic
+      snapshot the brief asks for, so a real mobile failure can be
+      classified afterward as (A) autoplay policy, (B) buffering/
+      network, (C) decode, (D) JS freeze, (E) element reset, or
+      (F) React re-render interference. */
+  const logEvent = (label: string, extra?: Record<string, unknown>) => {
     const video = videoRef.current;
-    if (video) video.load();
-  }, [preloadActive, active, preloadMode]);
-
-  const clearWatchdogs = () => {
-    if (watchdogIntervalRef.current) {
-      clearInterval(watchdogIntervalRef.current);
-      watchdogIntervalRef.current = null;
-    }
-    if (hardTimeoutRef.current) {
-      clearTimeout(hardTimeoutRef.current);
-      hardTimeoutRef.current = null;
-    }
-  };
-
-  const finish = () => {
-    if (completedRef.current) return;
-    completedRef.current = true;
-    clearWatchdogs();
-    onComplete();
-  };
-
-  /** TEMPORARY DIAGNOSTICS — safe to delete once the audio path is
-      confirmed working on the real target device/browser; only reads
-      state, never changes behavior. */
-  const logVideoState = (label: string) => {
-    const video = videoRef.current;
-    if (!video) return;
     // eslint-disable-next-line no-console
-    console.log(`[VideoScene DEBUG] ${label}`, {
-      muted: video.muted,
-      volume: video.volume,
-      paused: video.paused,
-      readyState: video.readyState,
-      currentSrc: video.currentSrc,
-      currentTime: video.currentTime,
-      duration: video.duration,
-      networkState: video.networkState,
-      error: video.error ? { code: video.error.code, message: video.error.message } : null,
+    console.log(`[VideoScene] ${label}`, {
+      currentTime: video?.currentTime,
+      duration: video?.duration,
+      readyState: video?.readyState,
+      networkState: video?.networkState,
+      paused: video?.paused,
+      muted: video?.muted,
+      errorCode: video?.error?.code,
+      errorMessage: video?.error?.message,
+      ...extra,
     });
   };
 
-  const attemptPlay = async (video: HTMLVideoElement, token: number) => {
-    logVideoState("before unmuted play() attempt");
-    try {
-      // The only place `muted`/`volume` are set for real playback — no
-      // React-controlled `muted` JSX prop exists on the element, so a
-      // re-render can never silently reassert a stale value here.
-      video.muted = false;
-      video.volume = 1;
-      await video.play();
-      if (runTokenRef.current !== token) return;
-      logVideoState("unmuted play() resolved");
-      setStage("playing");
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[VideoScene DEBUG] unmuted play() REJECTED:", err);
-      try {
-        video.muted = true;
-        await video.play();
-        if (runTokenRef.current !== token) return;
-        logVideoState("fallback muted play() resolved (needs tap-to-unmute)");
-        setNeedsUnmute(true);
-        setStage("playing");
-      } catch (err2) {
-        // eslint-disable-next-line no-console
-        console.error("[VideoScene DEBUG] fallback muted play() ALSO REJECTED — skipping scene:", err2);
-        if (runTokenRef.current !== token) return;
-        finish();
-      }
-    }
+  /** ITEM 3/4 — always starts MUTED (mobile browsers can reject
+      unmuted autoplay outright; muted autoplay is permitted almost
+      everywhere), and only actually calls `.play()` once the element
+      is genuinely ready. `video.muted`/`video.playsInline` are the
+      only properties this function touches, and it touches them
+      exactly once per playback start — never on a loop, never on a
+      timer. A rejected play() is logged and left alone: the `canplay`/
+      `loadedmetadata` listeners below will naturally retry once the
+      browser reports readiness, and the scene's own pointer handler
+      gives the user a direct, real-gesture way to unmute/resume too. */
+  const startPlayback = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = true;
+    video.playsInline = true;
+    setIsMuted(true);
+    logEvent("attempting play() (muted)");
+    video
+      .play()
+      .then(() => {
+        logEvent("play() resolved");
+      })
+      .catch((err) => {
+        logEvent("play() rejected — leaving element as-is, will retry on next canplay/gesture", {
+          err: String(err),
+        });
+      });
   };
 
-  /* Drives playback purely off the `active` prop instead of mount. */
+  /** Only actually starts playback once the element has reported
+      enough readiness — see item 4. `HAVE_FUTURE_DATA` (readyState 3)
+      is the same bar the native `canplay` event itself fires at. */
+  const tryStartIfReady = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.readyState >= 3) {
+      startPlayback();
+    }
+    // Otherwise: do nothing here. The `loadedmetadata`/`canplay`
+    // listeners below will call tryStartIfReady() again the moment the
+    // browser itself reports readiness — no polling, no timer.
+  };
+
+  /* Drives playback purely off the `active` prop — never off mount,
+     never off a timer. This is the ONLY place that starts or stops
+     playback in response to the story reaching/leaving this scene. */
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     if (active) {
-      const token = ++runTokenRef.current;
       completedRef.current = false;
       endedFiredRef.current = false;
-      retriedRef.current = false;
-      setNeedsUnmute(false);
-      setStage("entering");
-      video.currentTime = 0;
-      void attemptPlay(video, token);
-
-      // WATCHDOG: start fresh for this run of the scene. See the block
-      // comment above STALL_CHECK_MS for why this exists at all.
-      clearWatchdogs();
-      stallStrikesRef.current = 0;
-      lastCurrentTimeRef.current = 0;
-      userPausedRef.current = false;
-
-      watchdogIntervalRef.current = setInterval(() => {
-        if (completedRef.current) {
-          clearWatchdogs();
-          return;
-        }
-        const v = videoRef.current;
-        if (!v) return;
-        if (userPausedRef.current) return; // an intentional pause, not a stall
-        if (stageRef.current === "holding" || stageRef.current === "fading" || stageRef.current === "done") {
-          clearWatchdogs();
-          return;
-        }
-
-        const progressed = v.currentTime > lastCurrentTimeRef.current + 0.05;
-        lastCurrentTimeRef.current = v.currentTime;
-
-        if (progressed && !v.paused) {
-          stallStrikesRef.current = 0;
-          return;
-        }
-
-        stallStrikesRef.current += 1;
-
-        if (stallStrikesRef.current === STALL_STRIKES_TO_RETRY && !retriedRef.current) {
-          // eslint-disable-next-line no-console
-          console.warn("[VideoScene] no playback progress detected — reloading and retrying once:", {
-            paused: v.paused,
-            readyState: v.readyState,
-            networkState: v.networkState,
-            currentTime: v.currentTime,
-          });
-          retriedRef.current = true;
-          const retryToken = ++runTokenRef.current;
-          v.load();
-          v.currentTime = 0;
-          void attemptPlay(v, retryToken);
-        } else if (stallStrikesRef.current >= STALL_STRIKES_TO_FINISH) {
-          // eslint-disable-next-line no-console
-          console.warn("[VideoScene] still no playback progress after retry — skipping scene so the timeline can continue.");
-          if (!endedFiredRef.current) {
-            endedFiredRef.current = true;
-            onEnded?.();
-          }
-          finish();
-        }
-      }, STALL_CHECK_MS);
-
-      // WATCHDOG: absolute ceiling. Whatever else happens (a retry that
-      // itself stalls, a stage stuck on "entering", anything), the scene
-      // is force-finished by this point so the timeline can never be
-      // stuck here permanently.
-      hardTimeoutRef.current = setTimeout(() => {
-        if (completedRef.current) return;
-        // eslint-disable-next-line no-console
-        console.warn("[VideoScene] hard timeout reached — force-finishing the scene.");
-        if (!endedFiredRef.current) {
-          endedFiredRef.current = true;
-          onEnded?.();
-        }
-        finish();
-      }, HARD_TIMEOUT_MS);
+      setStage((s) => (s === "idle" ? "loading" : s));
+      tryStartIfReady();
     } else {
-      runTokenRef.current++; // invalidate any in-flight attempt from this run
-      if (holdTimer.current) clearTimeout(holdTimer.current);
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-      clearWatchdogs();
       video.pause();
       setStage("idle");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
-  /* Native listeners attached ONCE — the element itself is now
-     persistent for the app's whole lifetime, so there's no need (and
-     no opportunity) to re-attach these per scene entry. */
+  /* Native listeners, attached ONCE for the element's entire lifetime.
+     This is the single source of truth for playback state — nothing
+     in this file infers progress from elapsed wall-clock time. */
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
+    const handleLoadedMetadata = () => {
+      logEvent("loadedmetadata");
+      if (activeRef.current && stageRef.current === "loading") tryStartIfReady();
+    };
+
+    const handleCanPlay = () => {
+      logEvent("canplay");
+      if (
+        activeRef.current &&
+        (stageRef.current === "loading" || stageRef.current === "buffering")
+      ) {
+        tryStartIfReady();
+      }
+    };
+
+    const handlePlaying = () => {
+      logEvent("playing");
+      setStage("playing");
+    };
+
+    /* ITEM 5 — buffering must NEVER finish the scene. `waiting` fires
+       when the browser genuinely has to pause for more data; this only
+       ever updates the (purely cosmetic) stage label so the "still
+       loading" state is visible if needed — it never touches
+       `onComplete`, never touches `elapsed`, never calls `.load()`. */
+    const handleWaiting = () => {
+      logEvent("waiting (buffering)");
+      if (activeRef.current) setStage("buffering");
+    };
+
+    const handleStalled = () => {
+      logEvent("stalled");
+      // Deliberately a no-op beyond logging — see item 5/6. The
+      // browser owns recovery; `canplay`/`playing` will fire again on
+      // their own once data resumes, and this file must not race it
+      // with a `.load()` or a forced skip.
+    };
+
+    const handleProgress = () => {
+      const now = performance.now();
+      if (now - lastProgressLogRef.current < LOG_THROTTLE_MS) return;
+      lastProgressLogRef.current = now;
+      logEvent("progress");
+    };
+
+    const handleTimeUpdate = () => {
+      const now = performance.now();
+      if (now - lastTimeUpdateLogRef.current < LOG_THROTTLE_MS) return;
+      lastTimeUpdateLogRef.current = now;
+      logEvent("timeupdate");
+    };
+
+    /* ITEM 1/13 — the ONLY path that ever calls onComplete() for a
+       normal, successful playthrough. Nothing here estimates
+       completion from elapsed time or a timer. */
     const handleEnded = () => {
-      if (!activeRef.current) return;
-      logVideoState("native `ended` event fired");
+      logEvent("ended");
+      setStage("ended");
       if (!endedFiredRef.current) {
         endedFiredRef.current = true;
         onEnded?.();
       }
-      setStage("holding");
-      holdTimer.current = setTimeout(() => {
-        setStage("fading");
-        fadeTimer.current = setTimeout(() => {
-          setStage("done");
-          finish();
-        }, FADE_MS);
-      }, HOLD_MS);
+      // A short, fixed visual hold on the final frame — NOT a
+      // playback-progress mechanism. `ended` has already fired; this
+      // can only delay onComplete, never substitute for the event.
+      endHoldTimer.current = setTimeout(() => {
+        if (completedRef.current) return;
+        completedRef.current = true;
+        onComplete();
+      }, END_HOLD_MS);
     };
 
-    /** ROOT CAUSE OF "video scene skipped on mobile": this element has
-        had `src="/video/memory.mp4"` set since mount, and upgrades
-        from a cheap `preload="metadata"` to a real `preload="auto"`
-        buffer once the video phase is coming up soon (see the
-        `preloadActive` prop/effect above) — well before the scene is
-        actually reached. But this `error` listener is attached ONCE
-        for the component's
-        entire lifetime and, until this fix, reacted to ANY `error`
-        event by immediately calling `finish()` — which flips
-        `videoReleased` in App.tsx permanently true.
-
-        On a flaky/slow mobile connection it's common for that
-        background preload fetch to hiccup (an aborted range request,
-        a transient network error, the OS deprioritizing/pausing an
-        off-screen media element's buffering, mobile Safari's stricter
-        concurrent-media-element limits when the bg/hug <audio>
-        elements are also preloading) and fire a native `error` event
-        on the <video> element WHILE THE VIDEO SCENE ISN'T EVEN ACTIVE
-        YET. Because `completedRef`/`videoReleased` latch permanently
-        (only reset by replay()), that one stray early error silently
-        marked the whole scene "already finished" minutes before the
-        timeline ever got there — so when the timeline actually
-        reached the video phase, App.tsx's gate saw `videoReleased`
-        already true and let `elapsed` sail straight through the
-        video's slot in a single frame, i.e. the scene was skipped
-        with nothing ever visibly playing. Desktop's faster, steadier
-        connections rarely if ever trigger this; mobile does, reliably.
-
-        Fix: only ever treat a real `error` event as "the video failed,
-        move on" while the video scene is actually the active phase
-        (mirrors the existing `activeRef` guard already used in
-        `handleEnded` above). An error that fires during background
-        preloading, before the scene is reached, is now just logged
-        and ignored — the browser will still have another chance to
-        (re)buffer by the time `active` actually flips true, since the
-        `active` effect calls `attemptPlay()` again at that point
-        regardless of any earlier hiccup. */
+    /* ITEM 6 — no more "retry once, then finish" behavior, and no
+       arbitrary timers. A transient error (the overwhelmingly common
+       mobile case — a dropped range request, a momentary decoder
+       hiccup) is logged in full and otherwise left alone: the scene
+       stays visible, playback state is untouched, and the browser is
+       given the chance to recover on its own (a subsequent `canplay`/
+       `playing` event will resume the visible stage). onComplete() is
+       only ever called here if the browser itself reports a state that
+       is unambiguously permanent — either a real MediaError with code
+       MEDIA_ERR_SRC_NOT_SUPPORTED (4, the codec/source itself is
+       unusable, more data will never help), or networkState
+       NETWORK_NO_SOURCE (3, the browser has given up finding a valid
+       source entirely). Every other MediaError code (ABORTED,
+       NETWORK, DECODE) is treated as recoverable and just logged. */
     const handleError = () => {
+      const err = video.error;
+      logEvent("error", {
+        errorCodeName:
+          err?.code === 1
+            ? "MEDIA_ERR_ABORTED"
+            : err?.code === 2
+              ? "MEDIA_ERR_NETWORK"
+              : err?.code === 3
+                ? "MEDIA_ERR_DECODE"
+                : err?.code === 4
+                  ? "MEDIA_ERR_SRC_NOT_SUPPORTED"
+                  : "none",
+      });
+
+      const isPermanent = err?.code === 4 || video.networkState === 3;
+      if (!isPermanent) {
+        logEvent("error treated as transient — scene stays visible, no action taken");
+        return;
+      }
       if (!activeRef.current) {
-        // eslint-disable-next-line no-console
-        console.warn("[VideoScene] ignored a pre-scene media error (likely a background preload hiccup):", video.error);
+        logEvent(
+          "permanent error ignored — scene isn't active yet, will re-evaluate when it becomes active",
+        );
         return;
       }
-      // One-shot retry: a genuine error while the scene IS active (a
-      // real network drop mid-playback, not the pre-scene case above)
-      // still deserves one reload+replay attempt before we give up and
-      // skip — a single transient blip shouldn't cost the whole scene.
-      if (!retriedRef.current) {
-        retriedRef.current = true;
-        // eslint-disable-next-line no-console
-        console.warn("[VideoScene] media error during the active scene — retrying once:", video.error);
-        const token = ++runTokenRef.current;
-        video.load();
-        void attemptPlay(video, token);
-        return;
-      }
+      logEvent("permanent, unrecoverable media error while active — completing the scene");
       if (!endedFiredRef.current) {
         endedFiredRef.current = true;
         onEnded?.();
       }
-      finish();
+      if (!completedRef.current) {
+        completedRef.current = true;
+        onComplete();
+      }
     };
 
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("playing", handlePlaying);
+    video.addEventListener("waiting", handleWaiting);
+    video.addEventListener("stalled", handleStalled);
+    video.addEventListener("progress", handleProgress);
+    video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("ended", handleEnded);
     video.addEventListener("error", handleError);
     return () => {
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("playing", handlePlaying);
+      video.removeEventListener("waiting", handleWaiting);
+      video.removeEventListener("stalled", handleStalled);
+      video.removeEventListener("progress", handleProgress);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("ended", handleEnded);
       video.removeEventListener("error", handleError);
     };
@@ -487,222 +385,116 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
 
   useEffect(
     () => () => {
-      if (holdTimer.current) clearTimeout(holdTimer.current);
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-      clearWatchdogs();
+      if (endHoldTimer.current) clearTimeout(endHoldTimer.current);
     },
     [],
   );
 
-  const handleUnmute = () => {
+  /** ITEM 12 — exactly ONE pointer handler drives every in-scene
+      interaction (no separate onClick/onTouchStart/onPointerDown
+      combo, and App.tsx's global tap-to-advance never reaches into
+      playback anymore — see App.tsx's skip()). A tap:
+        - unmutes (a real, direct user gesture on this exact element —
+          exactly what mobile browsers require to permit sound), if
+          currently muted; otherwise
+        - pauses/resumes playback.
+      Never touches currentTime, playbackRate, or calls load(). */
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
     const video = videoRef.current;
     if (!video) return;
-    video.muted = false;
-    video.volume = 1;
-    setNeedsUnmute(false);
-    void video.play().catch((err) => {
-      // eslint-disable-next-line no-console
-      console.log("[VideoScene DEBUG] handleUnmute play() rejected:", err);
-    });
-  };
 
-  /** Shared pause/resume core — used by both the on-frame click handler
-      and the imperative `togglePauseResume()` (which App.tsx's
-      tap-to-advance "skip" calls for clicks on the middle of the
-      screen during the video scene). */
-  const handleTogglePauseResume = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (needsUnmute) {
-      handleUnmute();
+    if (video.muted) {
+      video.muted = false;
+      setIsMuted(false);
+      logEvent("unmuted via user gesture");
+      if (video.paused) {
+        video
+          .play()
+          .catch((err) => logEvent("resume-with-sound play() rejected", { err: String(err) }));
+      }
       return;
     }
-    if (stage !== "entering" && stage !== "playing") return;
+
     if (video.paused) {
-      userPausedRef.current = false;
-      void video.play().catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error("[VideoScene DEBUG] manual resume play() FAILED:", err);
-      });
+      video.play().catch((err) => logEvent("manual resume play() rejected", { err: String(err) }));
     } else {
-      userPausedRef.current = true;
       video.pause();
+      logEvent("paused via user gesture");
     }
-  };
-const handleSceneTap = (e: React.MouseEvent) => {
-  e.stopPropagation();
-
-  if (needsUnmute) {
-    handleUnmute();
-    return;
-  }
-
-  handleTogglePauseResume();
-};
-  const handleFrameClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    handleTogglePauseResume();
   };
 
   useImperativeHandle(
     ref,
     () => ({
-      /** Silent, gesture-linked play()+pause() cycle so this exact
-          <video> element is granted gesture-based playback permission
-          ahead of time — see the top-of-file note. Safe to call from
-          every gesture; a no-op once already primed. */
-      prime: () => {
-        if (primedRef.current) return;
-        const video = videoRef.current;
-        if (!video) return;
-        video.muted = false;
-        video.volume = 0;
-        video
-          .play()
-          .then(() => {
-            primedRef.current = true;
-            video.pause();
-            video.currentTime = 0;
-          })
-          .catch(() => {
-            // Still blocked — leave primedRef false so the next gesture
-            // (App.tsx's passive listener fires on every
-            // pointerdown/keydown/touchstart) retries automatically.
-            video.pause();
-          });
-      },
-      togglePauseResume: handleTogglePauseResume,
+      /** ITEM 11 — Replay is the one and only place `.load()` runs
+          outside of first mount. Fully resets the element back to a
+          clean state and waits for real readiness again before the
+          next `active` transition starts playback. */
       reset: () => {
         const video = videoRef.current;
         if (video) {
           video.pause();
-          // .load() clears any stale `video.error` from a previous run
-          // (e.g. the retried-and-still-failed case above) so a fresh
-          // run always starts from a clean media state, not one still
-          // carrying a prior error.
-          video.load();
           video.currentTime = 0;
+          video.load();
         }
-        runTokenRef.current++;
         completedRef.current = false;
         endedFiredRef.current = false;
-        retriedRef.current = false;
-        clearWatchdogs();
-        setNeedsUnmute(false);
+        if (endHoldTimer.current) clearTimeout(endHoldTimer.current);
+        setIsMuted(true);
         setStage("idle");
       },
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [needsUnmute, stage],
+    [],
   );
 
-  const fadingOut = stage === "fading" || stage === "done";
-  const visible = active && stage !== "idle" && stage !== "done";
+  const visible = active && stage !== "idle";
 
   return (
-    <motion.div
+    <div
       className="absolute inset-0 z-40 flex items-end justify-center px-5"
-      style={{ paddingBottom: `${frameBottomVh}vh`, pointerEvents: active ? "auto" : "none" }}
-      onClick={handleSceneTap}
-      initial={false}
-      animate={{ opacity: visible ? 1 : 0 }}
-      transition={{ duration: 0.8 }}
+      style={{
+        paddingBottom: `${frameBottomVh}vh`,
+        pointerEvents: active ? "auto" : "none",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.6s ease",
+      }}
+      onPointerDown={handlePointerDown}
     >
-      {/* Slightly dim the existing night sky behind the memory */}
-      <motion.div
-        className="absolute inset-0 bg-black"
-        animate={{ opacity: visible && !fadingOut ? 0.45 : 0 }}
-        transition={{ duration: 1 }}
-      />
-
-      {/* Floating particles / sparkles */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {Array.from({ length: 14 }).map((_, i) => (
-          <motion.span
-            key={i}
-            className="absolute rounded-full bg-gold/70"
-            style={{
-              left: `${6 + ((i * 37) % 90)}%`,
-              width: i % 3 === 0 ? 4 : 2,
-              height: i % 3 === 0 ? 4 : 2,
-              filter: "blur(0.5px)",
-            }}
-            initial={{ y: "100%", opacity: 0 }}
-            animate={{
-              y: visible && !fadingOut ? ["100%", "-10%"] : "100%",
-              opacity: visible && !fadingOut ? [0, 0.9, 0] : 0,
-            }}
-            transition={{
-              duration: 6 + (i % 5),
-              delay: i * 0.4,
-              repeat: visible && !fadingOut ? Infinity : 0,
-              ease: "easeOut",
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Cinematic glowing frame around the video. onClick here (not on
-          the full-screen wrapper above) is the "click the video ->
-          pause / click again -> resume" target — scoped to just the
-          frame so it never doubles up with the scene-wide tap-to-unmute
-          above. App.tsx's own tap-to-advance also reaches
-          togglePauseResume() (via the imperative handle) for clicks
-          outside the frame but still within the video scene. */}
-      <motion.div
-        className="pointer-events-auto relative w-[96vw] max-w-3xl rounded-[22px] p-[2px]"
+      {/* ITEM 8/9 — no particles, no animated glow, no backdrop-blur,
+          no animated shadow, no Framer Motion anywhere in this
+          component: the frame is a plain, visually-unchanged container
+          (same border/background as before) so the mobile GPU/decoder
+          budget goes to the actual video instead of decorative
+          effects. A short CSS opacity transition (above, and on the
+          frame below) is all that's used for entering/exiting. */}
+      <div
+        className="relative w-[96vw] max-w-3xl overflow-hidden rounded-[22px]"
         style={{
-          background: "linear-gradient(160deg, rgba(247,209,158,0.55), rgba(232,168,255,0.35))",
+          border: "1px solid rgba(247, 209, 158, 0.35)",
+          backgroundColor: "rgba(20, 10, 40, 0.55)",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.45)",
+          opacity: visible ? 1 : 0,
+          transition: "opacity 0.6s ease",
         }}
-        onClick={handleFrameClick}
-        animate={{ opacity: visible ? (fadingOut ? 0 : 1) : 0, scale: visible ? (fadingOut ? 0.94 : 1) : 0.88 }}
-        transition={{ duration: fadingOut ? 0.9 : 1.1, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* soft pulsing ambient glow — the "subtle animated border" */}
-        <motion.div
-          className="pointer-events-none absolute -inset-1 rounded-[26px]"
-          style={{ background: "radial-gradient(closest-side, rgba(232,168,255,0.45), transparent 70%)" }}
-          animate={{ opacity: visible && !fadingOut ? [0.35, 0.75, 0.35] : 0 }}
-          transition={{ duration: 3.2, repeat: visible && !fadingOut ? Infinity : 0, ease: "easeInOut" }}
+        <video
+          ref={videoRef}
+          src="/video/memory.mp4"
+          playsInline
+          preload="metadata"
+          controls={false}
+          className="block w-full"
+          style={{ objectFit: "contain", maxHeight: `${frameMaxHVh}vh` }}
         />
 
-        <div
-          className="relative overflow-hidden rounded-[20px] backdrop-blur-md"
-          style={{
-            backgroundColor: "rgba(20, 10, 40, 0.35)",
-            border: "1px solid rgba(247, 209, 158, 0.25)",
-            boxShadow: "0 0 40px rgba(232,168,255,0.3), 0 10px 40px rgba(0,0,0,0.5)",
-          }}
-        >
-          <video
-            ref={videoRef}
-            src="/video/memory.mp4"
-            playsInline
-            preload={preloadMode}
-            className="block w-full"
-            style={{ objectFit: "contain", maxHeight: `${frameMaxHVh}vh` }}
-          />
-
-          <AnimatePresence>
-            {needsUnmute && (stage === "entering" || stage === "playing") && (
-              <motion.button
-                key="unmute"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleUnmute();
-                }}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream backdrop-blur-sm"
-              >
-                <VolumeX size={14} /> Tap for sound
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.div>
-    </motion.div>
+        {isMuted && (stage === "playing" || stage === "buffering") && (
+          <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream">
+            <VolumeX size={14} /> Tap for sound
+          </div>
+        )}
+      </div>
+    </div>
   );
 });
 

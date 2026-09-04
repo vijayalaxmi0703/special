@@ -2,7 +2,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Volume2, VolumeX, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import Bunny, { HEAD_GEOMETRY, STAGE_H, STAGE_W, type BunnyPose, type IntroPhase, type LookTarget } from "./Bunny";
+import Bunny, {
+  HEAD_GEOMETRY,
+  STAGE_H,
+  STAGE_W,
+  type BunnyPose,
+  type IntroPhase,
+  type LookTarget,
+} from "./Bunny";
 import { Background, CrownGlow, Dialogue } from "./Scenery";
 import QuestionCard from "./QuestionCard";
 import VideoScene, { type VideoSceneHandle } from "./VideoScene";
@@ -24,7 +31,6 @@ export const DIALOGUE_LINES: string[] = [
   "mam i could have just wished u today through a message but..",
   "I have spent days coding this for u cuz ...",
   "I just wanted u to feel special today and hopefully make u smile a little🤗",
-
 ];
 
 export const HUG_LINES: string[] = [
@@ -37,7 +43,8 @@ export const HUG_LINES: string[] = [
   fallback (for when someone scrubs back to relive an already-answered
   moment) and by <QuestionCard> (for the live, unanswered moment) — so
   the two can never drift into showing different wording. */
-const QUESTION_TEXT = "I believe you are one of the best lecturers a student could ask for. Do you agree?";
+const QUESTION_TEXT =
+  "I believe you are one of the best lecturers a student could ask for. Do you agree?";
 
 /**
  * PEEK POSITIONING — LITERAL LEFT/OVERFLOW-HIDDEN CLIP
@@ -48,34 +55,35 @@ const QUESTION_TEXT = "I believe you are one of the best lecturers a student cou
 const PEEK_VISIBLE_FRACTION = 0.72;
 const HEAD_RIGHT = HEAD_GEOMETRY.left + HEAD_GEOMETRY.width; // 460
 const computeLeftHidden = (fitVal: number) => -fitVal * (STAGE_W + 200);
-const computeLeftVisible = (fitVal: number) => -fitVal * (HEAD_RIGHT - PEEK_VISIBLE_FRACTION * HEAD_GEOMETRY.width);
+const computeLeftVisible = (fitVal: number) =>
+  -fitVal * (HEAD_RIGHT - PEEK_VISIBLE_FRACTION * HEAD_GEOMETRY.width);
 const PEEK_TILT = -4;
 const peekTransition = { duration: 1.1, ease: [0.22, 1, 0.36, 1] as const };
 
 /* ================================================================== *
-* VIRTUAL TIMELINE
-*
-* Everything on screen is a pure function of one number, `elapsed`.
-* Autoplay increments it every frame; the hidden nav adds/subtracts
-* from it; the question gate simply caps how far forward it's allowed
-* to go until answered.
-*
-* Each phase's line array (TEXT_LINES) is run through
-* buildPhaseLines(), which gives every individual line its own duration
-* via readDuration() — longer sentences hold longer, short ones don't
-* linger — and a phase's total duration in FLOW_DURATIONS is just the
-* sum of its lines' durations.
-*
-* VIDEO SCENE: the crown → video → Final Affirmation block adds two
-* phases. "videoTransition" ("Wait…" / "Before we continue…") is an
-* ordinary caption-driven phase, exactly like preCrown or preHug —
-* nothing new about how it's timed. "video" is different: like
-* "questionActive", its real on-screen duration isn't a fixed number at
-* all, it's governed by an external event (the memory.mp4 `ended`
-* event, plus VideoScene's own hold/fade), so it uses the exact same
-* "gate" technique the question already uses — see `videoReleased` /
-* gateMs below.
-* ================================================================== */
+ * VIRTUAL TIMELINE
+ *
+ * Everything on screen is a pure function of one number, `elapsed`.
+ * Autoplay increments it every frame; the hidden nav adds/subtracts
+ * from it; the question gate simply caps how far forward it's allowed
+ * to go until answered.
+ *
+ * Each phase's line array (TEXT_LINES) is run through
+ * buildPhaseLines(), which gives every individual line its own duration
+ * via readDuration() — longer sentences hold longer, short ones don't
+ * linger — and a phase's total duration in FLOW_DURATIONS is just the
+ * sum of its lines' durations.
+ *
+ * VIDEO SCENE: the crown → video → Final Affirmation block adds two
+ * phases. "videoTransition" ("Wait…" / "Before we continue…") is an
+ * ordinary caption-driven phase, exactly like preCrown or preHug —
+ * nothing new about how it's timed. "video" is different: like
+ * "questionActive", its real on-screen duration isn't a fixed number at
+ * all, it's governed by an external event (the memory.mp4 `ended`
+ * event, plus VideoScene's own hold/fade), so it uses the exact same
+ * "gate" technique the question already uses — see `videoReleased` /
+ * gateMs below.
+ * ================================================================== */
 
 /** How long a single caption holds, purely as a function of its own
     character count — longer sentences get more time, short ones don't
@@ -118,9 +126,9 @@ const TEXT_LINES: Partial<Record<string, string[]>> = {
   pgCongrats: [
     "And Mam… there's something else I want to congratulate you for.",
     "Congratulations on your PhD journey MAM. 🎓",
-    'Balancing your studies, college, and everything you manage at home is no small achievement.✨',
+    "Balancing your studies, college, and everything you manage at home is no small achievement.✨",
     "Sometimes I wonder how you manage to carry so much and still keep moving forward with the same dedication. Honestly, seeing you do that inspires me more than you know.",
-    "I hope you’re always proud of how much you’re accomplishing, even on the days when it feels difficult."
+    "I hope you’re always proud of how much you’re accomplishing, even on the days when it feels difficult.",
   ],
   restMessage: [
     "Mamm It must get exhausting sometimes isnt it…",
@@ -248,26 +256,6 @@ const VIDEO_SEGMENT = TIMELINE.find((s) => s.phase === "video")!;
 
 const INTRO_PHASES: readonly Phase[] = ["introHidden", "introPeek", "introWave", "introGreeting"];
 
-/** LOADING STRATEGY (see VideoScene.tsx's `preloadActive` prop note):
-    the phases from "preCrown" through "video" itself — i.e. from
-    shortly before the crown sequence begins all the way up to the
-    memory clip actually playing. That's a comfortable ~20-30s head
-    start (crown pickup + fly + the "wait, there's something..."
-    transition lines) for the real video buffering to happen in the
-    background, without it ever competing with bandwidth/CPU during
-    the opening greeting/talk/question scenes. */
-const VIDEO_PRELOAD_PHASES = new Set<Phase>([
-  "preCrown",
-  "noticeCrown",
-  "walkToCrown",
-  "grabCrown",
-  "backToViewer",
-  "raiseCrown",
-  "crownFly",
-  "videoTransition",
-  "video",
-]);
-
 const introPhaseFor = (p: Phase): IntroPhase | undefined => {
   switch (p) {
     case "introHidden":
@@ -318,8 +306,8 @@ const computeWalkInX = (fitVal: number, leftVisiblePx: number) => {
 };
 
 /* ================================================================== *
-* HIDDEN NAV TUNING
-* ================================================================== */
+ * HIDDEN NAV TUNING
+ * ================================================================== */
 const NAV_JUMP_MS = 5000;
 const NAV_DOUBLE_TAP_JUMP_MS = 10000;
 const DOUBLE_TAP_WINDOW_MS = 450;
@@ -601,13 +589,20 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const lastTapRef = useRef<{ side: "left" | "right" | null; time: number }>({ side: null, time: 0 });
+  const lastTapRef = useRef<{ side: "left" | "right" | null; time: number }>({
+    side: null,
+    time: 0,
+  });
 
   /* Analytics guard: tracks which one-per-session event keys have
      already fired, so re-visiting a phase via the hidden nav (or a
      re-render) never sends a duplicate row. Reset in replay(). */
   const trackedRef = useRef<Set<string>>(new Set());
-  const trackOnce = (key: string, evt: Parameters<typeof track>[0], meta?: Record<string, unknown>) => {
+  const trackOnce = (
+    key: string,
+    evt: Parameters<typeof track>[0],
+    meta?: Record<string, unknown>,
+  ) => {
     if (trackedRef.current.has(key)) return;
     trackedRef.current.add(key);
     track(evt, meta);
@@ -739,14 +734,14 @@ export default function App() {
         });
       }
     }
-
-    // VIDEO SCENE: prime the memory <video> element's audio permission
-    // on every gesture too, so that by the time `phase === "video"`
-    // arrives, unmuted playback works with no extra button. Deferred
-    // slightly (see comment above) so it never delays the audio-unlock
-    // attempt above on the gesture that matters most: the very first
-    // one.
-    setTimeout(() => videoSceneRef.current?.prime(), 0);
+    // VIDEO SCENE ARCHITECTURE REWRITE: the memory <video> no longer
+    // needs gesture-linked priming — it always starts muted (see
+    // VideoScene.tsx's `startPlayback`), which every mobile browser
+    // permits without any prior gesture, and sound is only ever
+    // requested later via the video frame's own single pointer handler
+    // (a real, direct gesture on that exact element). Priming here was
+    // an extra, now-unnecessary network/decode task competing for the
+    // same tick as the audio-unlock attempt above.
   };
 
   /* Passive fallback: listens once, on mount, for the first legitimate
@@ -939,9 +934,15 @@ export default function App() {
   ].includes(phase);
   const holdingCrown = phase === "grabCrown" || phase === "backToViewer" || phase === "raiseCrown";
   const groundCrown = phase === "noticeCrown" || phase === "walkToCrown";
-  const smiling = ["introWave", "introGreeting", "wave", "release", "yesAffirm", "drMoment", "finalAffirmation"].includes(
-    phase,
-  );
+  const smiling = [
+    "introWave",
+    "introGreeting",
+    "wave",
+    "release",
+    "yesAffirm",
+    "drMoment",
+    "finalAffirmation",
+  ].includes(phase);
 
   /* MUSIC SYSTEM: the one orchestration effect. */
   useEffect(() => {
@@ -970,24 +971,25 @@ export default function App() {
       return () => window.clearTimeout(pauseTimer);
     }
 
-    // VIDEO SCENE: complete silence — not a duck — while the memory's
-    // own audio plays. Fade both tracks to 0 and pause them, same
-    // mechanism as the `muted` branch above, so nothing is ever
-    // audible at the same time as the video. Gated on !videoAudioDone
-    // so this stops applying the instant the video's `ended` event
-    // fires (see VideoScene's onEnded prop below) — not later, once
-    // the visual hold/fade has also finished — matching the exact
-    // "video ends -> bg resumes" sequencing from the brief.
+    // VIDEO SCENE ARCHITECTURE REWRITE (item 7): complete silence — not
+    // a duck, and not a faded-out silence either — the instant the
+    // video phase begins. The previous version faded both tracks out
+    // via requestAnimationFrame (fadeAudioVolume), which is exactly the
+    // kind of extra rAF work on the main thread that this round's brief
+    // says must not run "while the video is decoding." Both tracks are
+    // now paused immediately and synchronously, with no fade, no rAF,
+    // and no pending timer competing with the video for the next few
+    // frames. Gated on !videoAudioDone so this stops applying the
+    // instant the video's `ended` event fires (see VideoScene's
+    // onEnded prop below) — not later, once the visual hold/fade has
+    // also finished — matching the exact "video ends -> bg resumes"
+    // sequencing from the brief.
     if (phase === "video" && !videoAudioDone) {
       activeTargetRef.current = 0;
       wasVideoSilencedRef.current = true;
-      fadeAudioVolume(active, activeToken, 0, MUSIC_MUTE_FADE_MS);
-      fadeAudioVolume(inactive, inactiveToken, 0, MUSIC_MUTE_FADE_MS);
-      const pauseTimer = window.setTimeout(() => {
-        active.pause();
-        inactive.pause();
-      }, MUSIC_MUTE_FADE_MS);
-      return () => window.clearTimeout(pauseTimer);
+      active.pause();
+      inactive.pause();
+      return;
     }
 
     // FIX 2: never duck/un-duck across the crown+question sequence —
@@ -1054,15 +1056,18 @@ export default function App() {
   /* Tap-to-advance in the CENTER of the screen. */
   const skip = () => {
     tryPlayActive();
-    // VIDEO SCENE: clicking the middle/main content area while the
-    // memory is on screen pauses/resumes the actual <video> element
-    // instead of advancing the timeline (there's nothing to "skip" to
-    // anyway — this phase is gated on the video itself, see
-    // `videoReleased`/VIDEO_SEGMENT). Left/right nav zones and other
-    // buttons render above this at their own z-index with their own
-    // onClick + stopPropagation, so they're unaffected.
+    // VIDEO SCENE ARCHITECTURE REWRITE (item 12): the video scene now
+    // owns its own single pointer handler on its full-screen capture
+    // layer (z-40, pointer-events:auto only while active — see
+    // VideoScene.tsx), which sits above this <main> and stops
+    // propagation, so this handler never actually fires for a tap
+    // during the video phase in practice. This early return stays only
+    // as a defensive no-op — there's nothing to "skip" to anyway (this
+    // phase is gated on the video itself) — and deliberately does NOT
+    // reach into VideoScene's playback (no togglePauseResume() call
+    // here anymore): the brief is explicit that this global handler
+    // must never interfere with video playback control.
     if (phase === "video") {
-      videoSceneRef.current?.togglePauseResume();
       return;
     }
     if (isIntro) {
@@ -1100,7 +1105,8 @@ export default function App() {
     tryPlayActive();
     const side = direction === -1 ? "left" : "right";
     const now = performance.now();
-    const isDoubleTap = lastTapRef.current.side === side && now - lastTapRef.current.time < DOUBLE_TAP_WINDOW_MS;
+    const isDoubleTap =
+      lastTapRef.current.side === side && now - lastTapRef.current.time < DOUBLE_TAP_WINDOW_MS;
     lastTapRef.current = { side, time: now };
     const amount = isDoubleTap ? NAV_DOUBLE_TAP_JUMP_MS : NAV_JUMP_MS;
     applyElapsed(Math.max(0, Math.min(gateMs, elapsedRef.current + direction * amount)));
@@ -1136,7 +1142,10 @@ export default function App() {
       onClick={skip}
       className="relative h-[100dvh] w-full overflow-hidden bg-background font-body select-none"
     >
-      <Background showMoon={phase === "ending"} warm={["raiseCrown", "crownFly", "approach", "hug"].includes(phase)} />
+      <Background
+        showMoon={phase === "ending"}
+        warm={["raiseCrown", "crownFly", "approach", "hug"].includes(phase)}
+      />
 
       <AnimatePresence>
         {groundCrown && (
@@ -1148,7 +1157,10 @@ export default function App() {
             initial={{ opacity: 0, y: 16, scale: 0.9 }}
             animate={{ opacity: 1, y: [0, -6, 0], scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ opacity: { duration: 1 }, y: { duration: 3.2, repeat: Infinity, ease: "easeInOut" } }}
+            transition={{
+              opacity: { duration: 1 },
+              y: { duration: 3.2, repeat: Infinity, ease: "easeInOut" },
+            }}
           />
         )}
       </AnimatePresence>
@@ -1201,11 +1213,7 @@ export default function App() {
         >
           <div
             className="w-full"
-            style={
-              isVideoScene
-                ? { height: "100%", overflow: "hidden" }
-                : { height: "100%" }
-            }
+            style={isVideoScene ? { height: "100%", overflow: "hidden" } : { height: "100%" }}
           >
             <motion.div
               animate={isVideoScene ? { x: 0, y: -VIDEO_BUNNY_LIFT } : { x: 0, y: 0 }}
@@ -1225,7 +1233,6 @@ export default function App() {
         </div>
       )}
 
-
       <AnimatePresence>
         {phase === "hug" && (
           <motion.div
@@ -1242,9 +1249,22 @@ export default function App() {
                 key={i}
                 viewBox="0 0 32 29"
                 className="absolute h-6 w-6"
-                style={{ left: `${8 + i * 7.5}%`, bottom: "-8%", color: i % 2 ? "#f9a8c4" : "#e8607f" }}
-                animate={{ y: ["0vh", "-95vh"], opacity: [0, 1, 0], rotate: [0, i % 2 ? 18 : -18, 0] }}
-                transition={{ duration: 7 + (i % 4), delay: i * 0.45, repeat: Infinity, ease: "easeOut" }}
+                style={{
+                  left: `${8 + i * 7.5}%`,
+                  bottom: "-8%",
+                  color: i % 2 ? "#f9a8c4" : "#e8607f",
+                }}
+                animate={{
+                  y: ["0vh", "-95vh"],
+                  opacity: [0, 1, 0],
+                  rotate: [0, i % 2 ? 18 : -18, 0],
+                }}
+                transition={{
+                  duration: 7 + (i % 4),
+                  delay: i * 0.45,
+                  repeat: Infinity,
+                  ease: "easeOut",
+                }}
               >
                 <path
                   fill="currentColor"
@@ -1284,7 +1304,6 @@ export default function App() {
         active={phase === "video"}
         frameMaxHVh={VIDEO_FRAME_MAX_H_VH}
         frameBottomVh={VIDEO_FRAME_BOTTOM_VH}
-        preloadActive={VIDEO_PRELOAD_PHASES.has(phase)}
         onEnded={() => setVideoAudioDone(true)}
         onComplete={() => setVideoReleased(true)}
       />
@@ -1299,8 +1318,12 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
           >
-            <p className="font-display text-xs uppercase tracking-[0.35em] text-cream/60 sm:text-sm">Someday</p>
-            <p className="mt-2 font-display text-4xl text-gold drop-shadow-glow sm:text-5xl">Dr. {TEACHER_NAME}</p>
+            <p className="font-display text-xs uppercase tracking-[0.35em] text-cream/60 sm:text-sm">
+              Someday
+            </p>
+            <p className="mt-2 font-display text-4xl text-gold drop-shadow-glow sm:text-5xl">
+              Dr. {TEACHER_NAME}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
