@@ -48,9 +48,11 @@ import { VolumeX } from "lucide-react";
  *     media events (`playing`, `waiting`, `stalled`, `progress`,
  *     `timeupdate`, `canplay`, `ended`, `error`) — never by polling,
  *     never by a clock.
- *   - `video.load()` is called in exactly one place: `reset()`, used
- *     only by Replay. It is never called as part of normal playback,
- *     buffering recovery, or error handling.
+ *   - `video.load()` is never called anywhere in this file — not on
+ *     normal playback, not on buffering recovery, not on error
+ *     handling, and not even on Replay (`reset()` just pauses and
+ *     rewinds `currentTime`; the source hasn't changed, so there's
+ *     nothing a full pipeline reset would fix).
  *   - `currentTime`/`playbackRate`/`volume`/`muted` are each set once,
  *     at the moments described in the numbered items below — never
  *     continuously reassigned while the video plays.
@@ -58,10 +60,13 @@ import { VolumeX } from "lucide-react";
  *     for entering/exiting. No Framer Motion anywhere in this file, no
  *     particles, no animated glow, no backdrop-blur, no animated
  *     shadow — the video gets the mobile GPU/decoder's full budget.
- *   - Exactly ONE pointer handler drives all in-scene interaction (see
- *     `handlePointerDown` below): the wrapper's own `onPointerDown`.
- *     Nothing else in this file, and nothing in App.tsx, reaches into
- *     playback control anymore.
+ *   - The whole-scene wrapper is NOT a pointer target at all
+ *     (`pointerEvents: "none"`) — a general tap anywhere on/near the
+ *     video does nothing. The only interactive control is a small
+ *     dedicated unmute button (`handleUnmute` below), which is the one
+ *     and only thing in this file that can touch play/pause/muted once
+ *     the scene is active. Nothing in App.tsx reaches into playback
+ *     control either.
  *   - `onComplete()` (which lifts App.tsx's `videoReleased` gate and
  *     lets the story continue) is called from exactly two places: the
  *     native `ended` event, or a genuinely permanent media error (see
@@ -85,9 +90,13 @@ import { VolumeX } from "lucide-react";
 type Stage = "idle" | "loading" | "ready" | "playing" | "buffering" | "ended" | "error";
 
 export type VideoSceneHandle = {
-  /** Used only by App.tsx's replay(). The one place `.load()` is
-      allowed to run outside first mount. */
+  /** Used only by App.tsx's replay(). Rewinds the element without ever
+      calling `.load()`. */
   reset: () => void;
+  /** Used only by App.tsx's one-time first-gesture handler. A silent
+      muted play+pause probe that primes this element's own gesture
+      credit ahead of time. */
+  prime: () => void;
 };
 
 type Props = {
@@ -155,7 +164,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   const logEvent = (label: string, extra?: Record<string, unknown>) => {
     const video = videoRef.current;
     // eslint-disable-next-line no-console
-    console.log(`[VideoScene] ${label}`, {
+    console.log(`[VIDEO] ${label}`, {
       currentTime: video?.currentTime,
       duration: video?.duration,
       readyState: video?.readyState,
@@ -182,18 +191,27 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     const video = videoRef.current;
     if (!video) return;
     video.muted = true;
+    video.defaultMuted = true;
     video.playsInline = true;
     setIsMuted(true);
-    logEvent("attempting play() (muted)");
+    logEvent("play requested");
     video
       .play()
       .then(() => {
-        logEvent("play() resolved");
+        // Guard against a late resolution racing a since-deactivated
+        // scene (e.g. user navigated away via the hidden nav before
+        // this promise settled) — never flips stage back to "playing"
+        // for a scene that isn't active anymore.
+        if (!activeRef.current) return;
+        logEvent("play success");
       })
       .catch((err) => {
-        logEvent("play() rejected — leaving element as-is, will retry on next canplay/gesture", {
-          err: String(err),
-        });
+        // A rejected play() must NEVER finish or skip the scene — it's
+        // logged and left alone. The `canplay`/`playing` listeners will
+        // naturally retry once the browser reports readiness, and the
+        // dedicated unmute button gives the user a direct, real-gesture
+        // way to resume too.
+        logEvent("play blocked", { err: String(err) });
       });
   };
 
@@ -219,6 +237,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     if (!video) return;
 
     if (active) {
+      logEvent("scene active");
       completedRef.current = false;
       endedFiredRef.current = false;
       setStage((s) => (s === "idle" ? "loading" : s));
@@ -253,7 +272,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     };
 
     const handlePlaying = () => {
-      logEvent("playing");
+      logEvent("playing", { currentTime: video.currentTime });
       setStage("playing");
     };
 
@@ -263,12 +282,12 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
        loading" state is visible if needed — it never touches
        `onComplete`, never touches `elapsed`, never calls `.load()`. */
     const handleWaiting = () => {
-      logEvent("waiting (buffering)");
+      logEvent("waiting", { currentTime: video.currentTime });
       if (activeRef.current) setStage("buffering");
     };
 
     const handleStalled = () => {
-      logEvent("stalled");
+      logEvent("stalled", { currentTime: video.currentTime });
       // Deliberately a no-op beyond logging — see item 5/6. The
       // browser owns recovery; `canplay`/`playing` will fire again on
       // their own once data resumes, and this file must not race it
@@ -293,7 +312,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
        normal, successful playthrough. Nothing here estimates
        completion from elapsed time or a timer. */
     const handleEnded = () => {
-      logEvent("ended");
+      logEvent("ended", { currentTime: video.currentTime });
       setStage("ended");
       if (!endedFiredRef.current) {
         endedFiredRef.current = true;
@@ -390,59 +409,83 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     [],
   );
 
-  /** ITEM 12 — exactly ONE pointer handler drives every in-scene
-      interaction (no separate onClick/onTouchStart/onPointerDown
-      combo, and App.tsx's global tap-to-advance never reaches into
-      playback anymore — see App.tsx's skip()). A tap:
-        - unmutes (a real, direct user gesture on this exact element —
-          exactly what mobile browsers require to permit sound), if
-          currently muted; otherwise
-        - pauses/resumes playback.
-      Never touches currentTime, playbackRate, or calls load(). */
-  const handlePointerDown = (e: React.PointerEvent) => {
+  /** The whole-scene wrapper is deliberately NOT a pause/resume target
+      anymore — a general tap on the video area does nothing to
+      playback. The only interactive control is the small dedicated
+      unmute button below (`handleUnmute`), which is the sole thing
+      that can touch this element's play/pause/muted state once the
+      scene is active. This avoids the exact failure mode a browser-
+      generated synthetic click (firing after a touch elsewhere on the
+      screen) could otherwise trigger — an accidental pause the user
+      never intended. */
+  const handleUnmute = (e: React.PointerEvent) => {
     e.stopPropagation();
     const video = videoRef.current;
-    if (!video) return;
-
-    if (video.muted) {
-      video.muted = false;
-      setIsMuted(false);
-      logEvent("unmuted via user gesture");
-      if (video.paused) {
-        video
-          .play()
-          .catch((err) => logEvent("resume-with-sound play() rejected", { err: String(err) }));
-      }
-      return;
-    }
-
+    if (!video || !video.muted) return;
+    video.muted = false;
+    video.defaultMuted = false;
+    setIsMuted(false);
+    logEvent("unmuted via user gesture");
     if (video.paused) {
-      video.play().catch((err) => logEvent("manual resume play() rejected", { err: String(err) }));
-    } else {
-      video.pause();
-      logEvent("paused via user gesture");
+      video
+        .play()
+        .catch((err) => logEvent("resume-with-sound play() rejected", { err: String(err) }));
     }
   };
+
+  /** Guards `prime()` so it only ever runs its play/pause probe once —
+      called from App.tsx's one-time first-gesture handler. */
+  const primedRef = useRef(false);
 
   useImperativeHandle(
     ref,
     () => ({
-      /** ITEM 11 — Replay is the one and only place `.load()` runs
-          outside of first mount. Fully resets the element back to a
-          clean state and waits for real readiness again before the
-          next `active` transition starts playback. */
+      /** Replay: `.load()` is deliberately NOT called here anymore — the
+          source hasn't changed, so there's nothing `.load()` would fix
+          that pause()+currentTime=0 doesn't already do, and calling it
+          resets the whole media pipeline (decoder/buffer/network
+          request) for no reason. */
       reset: () => {
         const video = videoRef.current;
         if (video) {
           video.pause();
           video.currentTime = 0;
-          video.load();
         }
         completedRef.current = false;
         endedFiredRef.current = false;
         if (endHoldTimer.current) clearTimeout(endHoldTimer.current);
         setIsMuted(true);
         setStage("idle");
+      },
+      /** Called once, from App.tsx's first-gesture handler, well before
+          the video scene itself is ever reached. Grants this specific
+          <video> element its own per-element gesture-activation credit
+          (some mobile engines track this per element, same as the
+          background/hug <audio> priming) — a brief muted play+pause
+          probe, immediately rewound back to 0, so it leaves no visible
+          or audible trace and doesn't compete with the actual scene's
+          own `startPlayback()` later. Never sets `muted = false`, never
+          touches `volume`. A no-op if already primed or if the scene
+          has since become active (never pauses genuinely-active
+          playback). */
+      prime: () => {
+        const video = videoRef.current;
+        if (!video || primedRef.current || activeRef.current) return;
+        video.muted = true;
+        video.defaultMuted = true;
+        video.playsInline = true;
+        const p = video.play();
+        if (p && typeof p.then === "function") {
+          p.then(() => {
+            if (activeRef.current) return; // scene became active mid-prime — leave it playing
+            video.pause();
+            video.currentTime = 0;
+            primedRef.current = true;
+            logEvent("prime success");
+          }).catch((err) => {
+            logEvent("prime blocked", { err: String(err) });
+          });
+        }
       },
     }),
     [],
@@ -455,11 +498,10 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
       className="absolute inset-0 z-40 flex items-end justify-center px-5"
       style={{
         paddingBottom: `${frameBottomVh}vh`,
-        pointerEvents: active ? "auto" : "none",
+        pointerEvents: "none",
         opacity: visible ? 1 : 0,
         transition: "opacity 0.6s ease",
       }}
-      onPointerDown={handlePointerDown}
     >
       {/* ITEM 8/9 — no particles, no animated glow, no backdrop-blur,
           no animated shadow, no Framer Motion anywhere in this
@@ -490,9 +532,14 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
         />
 
         {isMuted && (stage === "playing" || stage === "buffering") && (
-          <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream">
+          <button
+            type="button"
+            onPointerDown={handleUnmute}
+            style={{ pointerEvents: "auto" }}
+            className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream"
+          >
             <VolumeX size={14} /> Tap for sound
-          </div>
+          </button>
         )}
       </div>
     </div>

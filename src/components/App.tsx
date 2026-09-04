@@ -747,15 +747,37 @@ export default function App() {
         });
       }
     }
-    // VIDEO SCENE ARCHITECTURE REWRITE: the memory <video> no longer
-    // needs gesture-linked priming — it always starts muted (see
-    // VideoScene.tsx's `startPlayback`), which every mobile browser
-    // permits without any prior gesture, and sound is only ever
-    // requested later via the video frame's own single pointer handler
-    // (a real, direct gesture on that exact element). Priming here was
-    // an extra, now-unnecessary network/decode task competing for the
-    // same tick as the audio-unlock attempt above.
+    // The memory <video> itself always starts muted when the scene
+    // becomes active (see VideoScene.tsx's `startPlayback`), which every
+    // mobile browser permits without any prior gesture — so this
+    // function (called repeatedly, from many gesture sites) doesn't need
+    // to touch it. The <video> element's own ONE-TIME gesture credit is
+    // primed separately below, from a single first-gesture listener, via
+    // `videoSceneRef.current?.prime()`.
   };
+
+  /** ONE-TIME media unlock: fires at most once, on the very first
+      pointerdown anywhere on the page, guarded by `mediaUnlockedRef`.
+      Starts background audio (if allowed) and primes the <video>
+      element's own gesture credit. Deliberately a single event
+      (`pointerdown`) with a ref guard, not the broader multi-event
+      passive listener below — that one exists to retry audio across
+      several gesture types/attempts; this one only ever needs to run
+      once. */
+  const mediaUnlockedRef = useRef(false);
+  useEffect(() => {
+    const handleFirstGesture = () => {
+      if (mediaUnlockedRef.current) return;
+      mediaUnlockedRef.current = true;
+      // eslint-disable-next-line no-console
+      console.log("[MEDIA] first user gesture");
+      tryPlayActive();
+      videoSceneRef.current?.prime();
+    };
+    window.addEventListener("pointerdown", handleFirstGesture);
+    return () => window.removeEventListener("pointerdown", handleFirstGesture);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Passive fallback: listens once, on mount, for the first legitimate
      gesture ANYWHERE on the page and, if the mic is on and the active
