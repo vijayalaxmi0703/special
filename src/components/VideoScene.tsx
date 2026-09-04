@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { VolumeX } from "lucide-react";
 
 /**
@@ -507,75 +508,89 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   const visible = active && stage !== "idle";
 
   /* ==================================================================
-   * TEMPORARY DIAGNOSTIC TEST — visual DOM only, playback logic above
-   * this line is completely untouched.
+   * TEMPORARY DIAGNOSTIC TEST #2 — WHERE the <video> DOM node lives,
+   * nothing about playback control. All playback logic above this
+   * line (attemptPlay, prime, reset, native listeners, playAttemptRef,
+   * the 900ms ended hold, error handling, debug logs) is completely
+   * untouched.
    *
-   * Purpose: determine whether the mobile freeze is caused by the
-   * decorative wrapper around <video> (overflow-hidden + rounded
-   * clipping + border + translucent background + boxShadow + an
-   * opacity CSS transition tied to `visible`) fighting the mobile
-   * GPU/compositor for the same resources the video decoder needs,
-   * rather than by playback itself.
+   * Purpose: isolate whether the mobile freeze is caused by the
+   * <video> being embedded inside <main>'s own compositing/stacking
+   * tree (overflow-hidden, the animated Bunny layers, Framer Motion
+   * layers, other z-index stacking contexts) rather than by playback
+   * itself. This renders the SAME <video> element (still exactly one
+   * <video> in the DOM, still controlled by the same `videoRef`,
+   * `active` prop, and event listeners) through a React portal
+   * straight into `document.body` — completely outside <main>.
    *
-   * What changed vs. the normal build, and nothing else:
-   *   - The two nested wrapper divs collapsed into one. The remaining
-   *     div keeps ONLY what's structurally required to position the
-   *     scene and show/hide it without ever unmounting <video> (App.tsx
-   *     calls videoSceneRef.current?.prime() on the first page gesture,
-   *     long before this scene is ever active, so the element must
-   *     already exist in the DOM at that point — that's a functional
-   *     requirement, not a decorative one, so it's kept).
-   *   - Show/hide now uses `visibility` instead of an animated
-   *     `opacity`, and has NO transition — opacity animations are
-   *     specifically one of the things a compositor-contention theory
-   *     would implicate, so it's removed for this test rather than
-   *     just left at a static value.
-   *   - No overflow-hidden, no rounded corners, no border, no
-   *     background color, no boxShadow anywhere in this render.
-   *   - <video> itself has no className and no Tailwind-driven styling
-   *     at all — just the plain inline style block you specified,
-   *     unchanged from what you gave me.
-   *   - The unmute button is unchanged in behavior/logic; it's
-   *     positioned against the one remaining wrapper (still
-   *     `position: absolute`, so `absolute bottom-3 right-3` still
-   *     resolves correctly without needing its own `relative` parent).
-   * ================================================================== */
-  return (
-    <div
-      className="absolute inset-0 z-40 flex items-end justify-center px-5"
+   * SSR safety: this is a TanStack Start app, so this component's
+   * first render can happen on the server, where `document` doesn't
+   * exist. Checking `typeof document !== "undefined"` means the
+   * server (and the very first pre-hydration client tick) renders
+   * nothing for the portal, and the real client render — which is
+   * everything that matters for a mobile browser actually playing the
+   * video — mounts it immediately after. The element is never
+   * conditionally unmounted/remounted based on `active` afterward,
+   * same guarantee as before (App.tsx's first-gesture handler calls
+   * `videoSceneRef.current?.prime()` well before the scene is ever
+   * active, and by then this has already mounted).
+   *
+   * Presentation while testing: `position: fixed`, centered, no
+   * opacity transition, no filters, no shadows, no clipping, no
+   * masks, no transform beyond the simple centering translateX — per
+   * the brief. `visibility` (not opacity) still gates it on `visible`
+   * so it doesn't sit on top of every other scene at z-index 9999
+   * while inactive; that's the same non-animated technique used in
+   * the previous diagnostic round, not a new effect. */
+  const videoNode = (
+    <video
+      ref={videoRef}
+      src="/video/memory.mp4"
+      playsInline
+      muted={isMuted}
+      preload="auto"
+      controls={false}
       style={{
-        paddingBottom: `${frameBottomVh}vh`,
-        pointerEvents: "none",
+        position: "fixed",
+        left: "50%",
+        bottom: `${frameBottomVh}vh`,
+        transform: "translateX(-50%)",
+        display: "block",
+        width: "96vw",
+        maxWidth: "768px",
+        maxHeight: `${frameMaxHVh}vh`,
+        objectFit: "contain",
+        zIndex: 9999,
         visibility: visible ? "visible" : "hidden",
       }}
-    >
-      <video
-        ref={videoRef}
-        src="/video/memory.mp4"
-        playsInline
-        muted={isMuted}
-        preload="auto"
-        controls={false}
-        style={{
-          display: "block",
-          width: "96vw",
-          maxWidth: "768px",
-          maxHeight: `${frameMaxHVh}vh`,
-          objectFit: "contain",
-        }}
-      />
+    />
+  );
 
-      {isMuted && (stage === "playing" || stage === "buffering") && (
-        <button
-          type="button"
-          onPointerDown={handleUnmute}
-          style={{ pointerEvents: "auto" }}
-          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream"
-        >
-          <VolumeX size={14} /> Tap for sound
-        </button>
-      )}
-    </div>
+  const unmuteButton = isMuted && (stage === "playing" || stage === "buffering") && (
+    <button
+      type="button"
+      onPointerDown={handleUnmute}
+      style={{
+        position: "fixed",
+        right: "16px",
+        bottom: `calc(${frameBottomVh}vh + 12px)`,
+        zIndex: 10000,
+        visibility: visible ? "visible" : "hidden",
+      }}
+      className="flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream"
+    >
+      <VolumeX size={14} /> Tap for sound
+    </button>
+  );
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <>
+      {videoNode}
+      {unmuteButton}
+    </>,
+    document.body,
   );
 });
 
