@@ -548,7 +548,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
       src="/video/memory.mp4"
       playsInline
       muted={isMuted}
-      preload="auto"
+      preload="none"
       controls={false}
       style={{
         position: "fixed",

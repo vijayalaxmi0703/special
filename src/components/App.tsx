@@ -13,7 +13,7 @@ import Bunny, {
 import { Background, CrownGlow, Dialogue } from "./Scenery";
 import QuestionCard from "./QuestionCard";
 import VideoScene, { type VideoSceneHandle } from "./VideoScene";
-import { track } from "./analytics";
+import { track, trackVisit } from "./analytics";
 
 /** 🚨 No teacher name was present anywhere in the project files or
     prompts I was given, and the brief is explicit not to invent one —
@@ -854,6 +854,7 @@ export default function App() {
   /* page_opened fires once, on mount. */
   useEffect(() => {
     track("page_opened");
+    trackVisit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1365,6 +1366,30 @@ export default function App() {
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 h-[26vh] bg-subtitle-scrim" />
       <Dialogue line={dialogueLine} tone={phase === "crownFly" ? "gold" : "soft"} />
+      <AnimatePresence>
+  {phase === "wave" && (
+    <motion.div
+      key="goodbye-message"
+      className="pointer-events-none absolute inset-x-0 top-[18%] z-40 px-6 text-center"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{
+        duration: 0.8,
+        delay: 0.4,
+        ease: "easeOut",
+      }}
+    >
+      <p className="font-display text-xl leading-relaxed text-cream drop-shadow-glow sm:text-2xl">
+        Sorry for taking a few minutes of your time, Mam...Thank you for watching this till the end. 
+        <br />
+        I hope this made u smile a little 😊
+        <br />
+       Take care mam
+      </p>
+    </motion.div>
+  )}
+</AnimatePresence>
 
       <AnimatePresence>
         {phase === "questionActive" && !answered && (
