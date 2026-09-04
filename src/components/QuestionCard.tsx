@@ -151,6 +151,22 @@ export default function QuestionCard({
     const reactionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastDodgeIndex = useRef<number>(-1);
+    /** MOBILE FIX: guards against a single physical tap producing more
+        than one attempt. On mobile, `pointerdown` and (on browsers/
+        WebViews that still dispatch legacy touch events alongside
+        Pointer Events) `touchstart` can both fire for the same finger
+        contact, and a touch also synthesizes a `pointerenter` right
+        before its `pointerdown` — so a naive "call handleNoAttempt from
+        every one of these events" setup (the previous implementation)
+        could register 2-3 attempts from one tap. The button's handlers
+        below are already narrowed (onPointerEnter only reacts to real
+        mouse hover; onTouchStart is removed entirely since
+        onPointerDown already covers touch on every modern mobile
+        browser), but this timestamp guard is kept as defense-in-depth
+        against any remaining duplicate-event combination. A real second
+        tap is never this close together, so the window is short. */
+    const lastAttemptAtRef = useRef(0);
+    const ATTEMPT_DEDUPE_MS = 120;
 
     useEffect(
         () => () => {
@@ -169,9 +185,14 @@ export default function QuestionCard({
 
     const handleNoAttempt = () => {
         if (!noInteractive) return;
+        const now =
+            typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+        if (now - lastAttemptAtRef.current < ATTEMPT_DEDUPE_MS) return;
+        lastAttemptAtRef.current = now;
         const next = attempts + 1;
         setAttempts(next);
         onAttempt(next);
+
 
         const isFinal = next === MAX_NO_ATTEMPTS;
         const nextIndex = pickDodgeIndex(lastDodgeIndex.current);
@@ -204,7 +225,7 @@ export default function QuestionCard({
                 floating magical dialogue card rather than a UI rectangle
                 dropped on top of the scene. */}
             <div
-                className="pointer-events-auto relative w-[92vw] max-w-sm rounded-[26px] p-[1.5px] shadow-2xl backdrop-blur-md"
+                className="pointer-events-auto relative w-[92vw] max-w-sm rounded-[26px] p-[1.5px] shadow-2xl backdrop-blur-sm sm:backdrop-blur-md"
                 style={{
                     maxHeight: `${CARD_MAX_HEIGHT_VH}vh`,
                     background: `linear-gradient(160deg, ${COLOR.outerFrom}, ${COLOR.outerTo})`,
@@ -225,7 +246,7 @@ export default function QuestionCard({
                     family as the outer frame but very slightly lighter so the
                     text area reads as a distinct surface. */}
                 <div
-                    className="flex h-full flex-col justify-center gap-3 rounded-[24px] border border-dashed px-4 py-4 text-center backdrop-blur-md sm:gap-4 sm:px-6 sm:py-5"
+                    className="flex h-full flex-col justify-center gap-3 rounded-[24px] border border-dashed px-4 py-4 text-center backdrop-blur-sm sm:gap-4 sm:px-6 sm:py-5 sm:backdrop-blur-md"
                     style={{
                         backgroundColor: "rgba(20, 10, 40, 0.55)",
                         borderColor: COLOR.innerBorder,
@@ -259,9 +280,27 @@ export default function QuestionCard({
                             {!noHidden && (
                                 <motion.button
                                     key="no-button"
-                                    onPointerEnter={handleNoAttempt}
+                                    /* MOBILE FIX: onPointerEnter only counts as an
+                                       attempt for a real mouse (the "evasive on
+                                       hover" desktop behavior this was designed
+                                       for) — on touch, every tap synthesizes a
+                                       pointerenter immediately before its
+                                       pointerdown, so leaving this unguarded
+                                       double-counted every single mobile tap.
+                                       onTouchStart has been removed entirely:
+                                       onPointerDown already fires for touch input
+                                       on every mobile browser this needs to
+                                       support, so keeping both meant two attempts
+                                       registered per physical tap. One tap now
+                                       reaches handleNoAttempt at most once via
+                                       onPointerDown (mouse clicks also go through
+                                       this same path), with the timestamp guard
+                                       inside handleNoAttempt itself as a second
+                                       layer of protection. */
+                                    onPointerEnter={(e) => {
+                                        if (e.pointerType === "mouse") handleNoAttempt();
+                                    }}
                                     onPointerDown={handleNoAttempt}
-                                    onTouchStart={handleNoAttempt}
                                     onClick={(e) => e.preventDefault()}
                                     initial={false}
                                     animate={{ opacity: 1, scale: 1, x: noOffset.x, y: noOffset.y }}

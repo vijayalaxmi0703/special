@@ -646,35 +646,80 @@ export default function App() {
       currently on screen — a gesture during the video must never
       resume background/hug music. */
   const tryPlayActive = () => {
-    // VIDEO SCENE: silently prime the memory <video> element's audio
-    // permission on every gesture that already reaches this function
-    // (clicks, taps, keydowns — see the passive listener below) so
-    // that by the time `phase === "video"` actually arrives, the
-    // browser has already granted this exact element gesture-based
-    // playback history and unmuted playback works with no extra
-    // button. Safe to call every time — it's a no-op once primed.
-    videoSceneRef.current?.prime();
-    if (mutedRef.current) return;
-    if (videoActiveRef.current) return;
-    const active = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
-    const inactive = isHugSceneRef.current ? bgAudioRef.current : hugAudioRef.current;
-    if (active && active.paused) {
-      void activateTrack(active, activeTargetRef.current);
+    // MOBILE FIX (music only starting after a tap, unreliably): the
+    // actual audio-unlock attempt now runs FIRST, synchronously, inside
+    // whatever gesture called this — that's the one thing that must not
+    // be delayed or made to compete for the same gesture. Priming the
+    // <video> element (a real network resource, up to 9MB) used to run
+    // first on every single call site; kicking off that fetch/decode
+    // work in the same synchronous tick as the audio-unlock attempt is
+    // unnecessary contention right at the one moment the audio *must*
+    // succeed, so it's now deferred a tick below instead — it doesn't
+    // need to be gesture-synchronous itself, only gesture-*linked*
+    // (i.e. triggered "because a gesture happened", which a
+    // zero-delay setTimeout from inside the gesture handler still is).
+    if (!mutedRef.current && !videoActiveRef.current) {
+      const active = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
+      const inactive = isHugSceneRef.current ? bgAudioRef.current : hugAudioRef.current;
+      if (active && active.paused) {
+        // MOBILE FIX: this is the single most safety-critical play()
+        // attempt in the app — it's the one a real user gesture is
+        // available for. Previously it used the no-retry
+        // `activateTrack`, while the *non*-gesture-linked call in the
+        // main orchestration effect (main clock/phase-driven, so it can
+        // never itself satisfy an autoplay-permission check) got the
+        // 4-attempt `activateTrackWithRetry`. That's backwards — this is
+        // the call that should retry, since a transient failure here
+        // (e.g. the element hasn't buffered its first frame of audio
+        // yet) is exactly the kind of thing a short retry can recover
+        // from without needing another gesture.
+        void activateTrackWithRetry(active, activeTargetRef.current);
+      }
+      if (inactive && inactive.paused) {
+        const primedTrack = inactive;
+        void primeTrack(primedTrack, () => {
+          const nowActive = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
+          return nowActive !== primedTrack;
+        });
+      }
     }
-    if (inactive && inactive.paused) {
-      const primedTrack = inactive;
-      void primeTrack(primedTrack, () => {
-        const nowActive = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
-        return nowActive !== primedTrack;
-      });
-    }
+
+    // VIDEO SCENE: prime the memory <video> element's audio permission
+    // on every gesture too, so that by the time `phase === "video"`
+    // arrives, unmuted playback works with no extra button. Deferred
+    // slightly (see comment above) so it never delays the audio-unlock
+    // attempt above on the gesture that matters most: the very first
+    // one.
+    setTimeout(() => videoSceneRef.current?.prime(), 0);
   };
 
-  /* Passive fallback: listens once, on mount, for the first
-     pointerdown/touchstart/keydown ANYWHERE on the page and, if the mic
-     is on and the active track is still paused, starts it. */
+  /* Passive fallback: listens once, on mount, for the first legitimate
+     gesture ANYWHERE on the page and, if the mic is on and the active
+     track is still paused, starts it.
+
+     MOBILE FIX (music only starting after a tap): `pointerdown`/
+     `touchstart`/`keydown` alone isn't a reliable enough set — some
+     mobile browsers (notably iOS Safari) don't treat the *start* of a
+     touch as a completed user-activation gesture for audio purposes,
+     only the touch actually finishing (`touchend`) or the resulting
+     synthetic `click`/`mouseup`. Without those, a browser that follows
+     that stricter model would reject every play() attempt from this
+     listener on the first tap and only succeed on whatever later
+     interaction happened to be a real `click` (e.g. a button), which is
+     exactly the "only starts after I tap the screen [again/elsewhere]"
+     symptom reported. Listening on the full set below means the very
+     first tap succeeds on whichever of these events that specific
+     browser actually honors, instead of silently waiting for a second,
+     unrelated interaction. */
   useEffect(() => {
-    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
+    const events: Array<keyof WindowEventMap> = [
+      "pointerdown",
+      "touchstart",
+      "touchend",
+      "mouseup",
+      "click",
+      "keydown",
+    ];
     events.forEach((evt) => window.addEventListener(evt, tryPlayActive));
     return () => events.forEach((evt) => window.removeEventListener(evt, tryPlayActive));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1111,6 +1156,7 @@ export default function App() {
                 pose={pose}
                 look={isVideoScene ? videoGlance : look}
                 talking={talking}
+                talkClockMs={elapsed}
                 walking={walking}
                 smiling={smiling}
                 holdingCrown={holdingCrown}

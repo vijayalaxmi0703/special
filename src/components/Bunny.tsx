@@ -60,7 +60,7 @@
  * itself was always fine at /crown.png.
  */
 import { AnimatePresence, motion, type Transition } from "framer-motion";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 export const STAGE_W = 600;
 export const STAGE_H = 700;
@@ -94,6 +94,12 @@ type Props = {
   pose?: BunnyPose;
   look?: LookTarget;
   talking?: boolean;
+  /** The master timeline's `elapsed` clock (ms), passed straight through
+      from App.tsx. Drives the mouth animation — see useMouthFrame above
+      for why this replaced an internal setInterval. Defaults to a
+      Date.now()-based fallback so this prop can be omitted (e.g. by
+      IntroBunny's call sites, which never talk) without crashing. */
+  talkClockMs?: number;
   walking?: boolean;
   smiling?: boolean;
   holdingCrown?: boolean;
@@ -172,25 +178,49 @@ if (typeof window !== "undefined") {
   scheduleIdle(() => preloadImages([CROWN_ASSET]));
 }
 
-/** Hook: returns the mouth image src to show right now. Advances through
-    MOUTH_FRAMES on an interval while `talking` is true; snaps back to (and
-    stays on) the closed frame the instant `talking` goes false. This is
-    the entire "speaking animation" — no transforms involved. */
-function useMouthFrame(talking: boolean): string {
-  const [frame, setFrame] = useState(0);
+/** Hook: returns the mouth image src to show right now, derived purely
+    from `clockMs` — the same master `elapsed` clock App.tsx's single
+    rAF loop already drives the entire rest of the timeline with —
+    instead of an independent `setInterval`.
+
+    MOBILE FIX ("mouth animation stops midway"): the previous version
+    ran its own `setInterval(..., MOUTH_STEP_MS)`, a second, completely
+    separate timer from the master clock. Independent timers like this
+    are exactly the kind of thing mobile browsers can throttle, delay,
+    or (under sustained main-thread/memory pressure — e.g. while the
+    3 always-large, oversized mouth PNGs this file used to preload were
+    still ~2MB/6MB-decoded-bitmap each; see the asset-size fix noted at
+    the top of this file) silently stop advancing, with nothing to
+    notice or recover — a `setInterval` callback that stops firing
+    doesn't throw or unmount, it just quietly stops. There was no way
+    to tell it had died, and no self-healing.
+
+    Deriving the frame purely from `clockMs` removes that whole failure
+    mode: there's no separate timer to stall, drift, or leak. Every
+    render simply asks "given how much time has passed since talking
+    started, which frame should be showing right now?" — if a frame is
+    skipped because the browser was momentarily busy, the very next
+    render (driven by the same clock that's already reliably driving
+    every other on-screen change) lands on the *correct* frame for
+    the actual elapsed time instead of continuing from wherever a
+    stalled interval left off. `talkStartRef` records the clock value
+    at the instant `talking` turns true so the cycle still restarts at
+    the closed frame each time a talking phase begins, exactly like the
+    previous implementation. */
+function useMouthFrame(talking: boolean, clockMs: number): string {
+  const talkStartRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!talking) {
-      setFrame(0);
-      return;
-    }
-    const id = setInterval(() => {
-      setFrame((f) => (f + 1) % MOUTH_FRAMES.length);
-    }, MOUTH_STEP_MS);
-    return () => clearInterval(id);
+    talkStartRef.current = talking ? clockMs : null;
+    // Only the true/false transition should reset the start point —
+    // clockMs changes every frame and must not retrigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [talking]);
 
-  return talking ? MOUTH_FRAMES[frame]! : MOUTH_CLOSED;
+  if (!talking || talkStartRef.current === null) return MOUTH_CLOSED;
+  const sinceStart = Math.max(0, clockMs - talkStartRef.current);
+  const idx = Math.floor(sinceStart / MOUTH_STEP_MS) % MOUTH_FRAMES.length;
+  return MOUTH_FRAMES[idx]!;
 }
 
 /** MOUTH POSITION FIX: the reported "whole mouth moving up/down" bug is
@@ -383,10 +413,11 @@ function IntroBunny({
   );
 }
 
-export default function Bunny({
+function BunnyImpl({
   pose = "idle",
   look = "viewer",
   talking = false,
+  talkClockMs,
   walking = false,
   smiling = false,
   holdingCrown = false,
@@ -396,7 +427,10 @@ export default function Bunny({
   walkInFrom,
 }: Props) {
   const [blink, setBlink] = useState(false);
-  const mouthSrc = useMouthFrame(talking);
+  // Fallback clock (wall-clock ms) covers any call site that doesn't
+  // pass talkClockMs — talking will be false there anyway (IntroBunny
+  // never talks), so this value is never actually read in practice.
+  const mouthSrc = useMouthFrame(talking, talkClockMs ?? Date.now());
   const mouthBox = useMouthBoxSize(P.mouth.width);
 
   useEffect(() => {
@@ -680,3 +714,36 @@ export default function Bunny({
     </motion.div>
   );
 }
+
+/** MOBILE PERF FIX (general lag): App.tsx's single rAF clock updates
+    `elapsed` every animation frame, which by default re-renders this
+    entire component (and its many motion.div children) 60 times a
+    second even during long stretches where nothing about the bunny
+    actually needs to change — most phases aren't talking, so the new
+    clock-driven mouth (see useMouthFrame above) doesn't need a fresh
+    `talkClockMs` on every one of those renders either. This comparator
+    skips the re-render whenever every prop that could actually change
+    the visible output is unchanged — except it deliberately keeps
+    re-rendering every frame while `talking` is true, since that's
+    exactly when a fresh `talkClockMs` is what drives the mouth. Nothing
+    about the visual design, timing, or behavior changes — this only
+    removes redundant renders where the output would've been pixel
+    identical anyway. */
+function bunnyPropsAreEqual(prev: Props, next: Props): boolean {
+  if (prev.talking !== next.talking) return false;
+  if (next.talking && prev.talkClockMs !== next.talkClockMs) return false;
+  return (
+    prev.pose === next.pose &&
+    prev.look === next.look &&
+    prev.walking === next.walking &&
+    prev.smiling === next.smiling &&
+    prev.holdingCrown === next.holdingCrown &&
+    prev.introPhase === next.introPhase &&
+    prev.peekX === next.peekX &&
+    prev.peekTilt === next.peekTilt &&
+    prev.walkInFrom === next.walkInFrom
+  );
+}
+
+const Bunny = memo(BunnyImpl, bunnyPropsAreEqual);
+export default Bunny;

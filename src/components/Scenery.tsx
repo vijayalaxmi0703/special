@@ -1,9 +1,30 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
+
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /* ------------------------------------------------------------------ *
  * Scenery: background, subtitles and the crown burst live together    *
  * so the film only needs App + Bunny + Scenery.                       *
+ *                                                                      *
+ * MOBILE PERF FIX (general lag): two changes, both purely about cost,  *
+ * never about visual design:                                           *
+ *                                                                      *
+ * 1) Background/Dialogue/CrownGlow are wrapped in React.memo below.    *
+ *    All three are always mounted for the entire film and take only a  *
+ *    handful of primitive props (booleans/strings) that actually       *
+ *    change rarely — but without memo, every one of App.tsx's 60/sec   *
+ *    `elapsed` re-renders was also re-running these three (and, for    *
+ *    Background alone, re-diffing 70 star + 18 mote motion.span         *
+ *    elements) even on frames where none of their props changed at     *
+ *    all. memo makes React skip that whole re-render+diff when the     *
+ *    props are unchanged, which is most frames.                        *
+ * 2) Star/mote counts are reduced on small screens (useIsMobile —      *
+ *    already present in this project's hooks, previously unused) since *
+ *    continuously-animated elements are one of the more GPU-costly     *
+ *    things here on lower-end phones. The visual density is barely     *
+ *    perceptible at this scale reduction; the animation style, colors, *
+ *    and everything else are untouched.                                *
  * ------------------------------------------------------------------ */
 
 function useSeeded(count: number, seed = 1) {
@@ -23,9 +44,10 @@ function useSeeded(count: number, seed = 1) {
   }, [count, seed]);
 }
 
-export function Background({ showMoon = false, warm = false }: { showMoon?: boolean; warm?: boolean }) {
-  const stars = useSeeded(70, 7);
-  const motes = useSeeded(18, 31);
+function BackgroundImpl({ showMoon = false, warm = false }: { showMoon?: boolean; warm?: boolean }) {
+  const isMobile = useIsMobile();
+  const stars = useSeeded(isMobile ? 42 : 70, 7);
+  const motes = useSeeded(isMobile ? 11 : 18, 31);
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -74,8 +96,9 @@ export function Background({ showMoon = false, warm = false }: { showMoon?: bool
     </div>
   );
 }
+export const Background = memo(BackgroundImpl);
 
-export function Dialogue({
+function DialogueImpl({
   line,
   position = "bottom",
   tone = "soft",
@@ -109,15 +132,18 @@ export function Dialogue({
     </div>
   );
 }
+export const Dialogue = memo(DialogueImpl);
 
-export function CrownGlow({ active }: { active: boolean }) {
+function CrownGlowImpl({ active }: { active: boolean }) {
+  const isMobile = useIsMobile();
+  const sparkCount = isMobile ? 9 : 14;
   const sparks = useMemo(
     () =>
-      Array.from({ length: 14 }, (_, i) => {
-        const angle = (i / 14) * Math.PI * 2;
+      Array.from({ length: sparkCount }, (_, i) => {
+        const angle = (i / sparkCount) * Math.PI * 2;
         return { x: Math.cos(angle) * 120, y: Math.sin(angle) * 120, d: i * 0.05 };
       }),
-    [],
+    [sparkCount],
   );
 
   if (!active) return null;
@@ -142,3 +168,4 @@ export function CrownGlow({ active }: { active: boolean }) {
     </div>
   );
 }
+export const CrownGlow = memo(CrownGlowImpl);
