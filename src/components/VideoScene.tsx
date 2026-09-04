@@ -70,6 +70,52 @@ type Stage = "idle" | "entering" | "playing" | "holding" | "fading" | "done";
 const HOLD_MS = 1500;
 const FADE_MS = 900;
 
+/**
+ * WATCHDOG (mobile hard-stop fix): this is the piece that was actually
+ * missing before. `ended` and `error` are the only two events this
+ * component reacted to — but on a real mobile device it's entirely
+ * possible for neither to ever fire: `video.play()` returns a promise
+ * that only settles once playback genuinely starts, and on a slow/
+ * flaky mobile connection (or when the browser silently deprioritizes
+ * an off-screen/backgrounded media element's buffering, or throttles a
+ * page running 2 <audio> + 1 <video> at once) that promise can just
+ * hang — neither resolving nor rejecting — while `preload="auto"`
+ * quietly keeps trying to buffer. No `error` event fires (nothing
+ * actually failed), so `handleError` never runs; no `ended` event fires
+ * (playback never started), so `handleEnded` never runs either. Result:
+ * `stage` sits in "entering" forever, `finish()` is never called,
+ * `onComplete` never fires, and App.tsx's `videoReleased` gate — which
+ * caps `elapsed` at the video segment until that gate lifts — holds the
+ * ENTIRE timeline there permanently. That is the exact reported bug:
+ * everything before VideoScene is fine, VideoScene starts, and nothing
+ * after it ever plays.
+ *
+ * The fix is a small watchdog, independent of any single video event:
+ * every STALL_CHECK_MS while the scene is active and not already
+ * resolved, check whether `video.currentTime` has actually advanced
+ * since the last check (and whether the element is still paused when
+ * it shouldn't be). No progress for STALL_STRIKES_TO_RETRY checks in a
+ * row -> one reload+replay attempt (same one-shot retry `handleError`
+ * already used for genuine mid-scene errors, just reached by a
+ * different trigger). Still no progress after that -> `finish()`, the
+ * same graceful "skip the scene" used everywhere else, which lifts the
+ * gate exactly once (guarded by `completedRef`, so this can never
+ * double-advance the timeline even if `ended`/`error` also fire around
+ * the same time). On top of the strike-based check, HARD_TIMEOUT_MS is
+ * an unconditional ceiling from the moment the scene becomes active —
+ * regardless of stage, retries, or any other state, the scene is
+ * force-finished once this elapses, so there is no code path left that
+ * can hold the timeline at VideoScene forever.
+ *
+ * A user-initiated pause (via the existing tap-to-pause/resume) must
+ * never be mistaken for a stall — `userPausedRef` suspends stall
+ * counting while true.
+ */
+const STALL_CHECK_MS = 3000;
+const STALL_STRIKES_TO_RETRY = 2; // ~6s of no progress before the one-shot reload+retry
+const STALL_STRIKES_TO_FINISH = 4; // ~12s of no progress (including the retry) before giving up gracefully
+const HARD_TIMEOUT_MS = 30000; // absolute ceiling — the scene is force-finished no matter what by this point
+
 export type VideoSceneHandle = {
   prime: () => void;
   togglePauseResume: () => void;
@@ -117,17 +163,50 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
   useEffect(() => {
     activeRef.current = active;
   }, [active]);
+  /** Live mirror of `stage`, read by the watchdog's setInterval callback
+      below — that interval is created once per `active` transition (the
+      effect only depends on `active`), so closing over `stage` directly
+      would freeze it at whatever value it held at that moment instead of
+      tracking later stage changes. */
+  const stageRef = useRef<Stage>("idle");
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
   /** True once a silent, gesture-linked play()+pause() has actually
       succeeded on this element — see `prime()` below. */
   const primedRef = useRef(false);
   /** Guards the one-shot retry-on-error below so a genuinely broken
       video can still fall through to finish() rather than retrying
-      forever. Reset every time `active` newly becomes true. */
+      forever. Reset every time `active` newly becomes true. Shared
+      between `handleError` and the watchdog below — only one reload
+      attempt is ever made per scene entry, regardless of which one
+      triggers it. */
   const retriedRef = useRef(false);
+
+  /* WATCHDOG state — see the block comment above STALL_CHECK_MS. */
+  const watchdogIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCurrentTimeRef = useRef(0);
+  const stallStrikesRef = useRef(0);
+  /** True while the pause is one the user asked for (via tap), so the
+      watchdog never mistakes an intentional pause for a stall. */
+  const userPausedRef = useRef(false);
+
+  const clearWatchdogs = () => {
+    if (watchdogIntervalRef.current) {
+      clearInterval(watchdogIntervalRef.current);
+      watchdogIntervalRef.current = null;
+    }
+    if (hardTimeoutRef.current) {
+      clearTimeout(hardTimeoutRef.current);
+      hardTimeoutRef.current = null;
+    }
+  };
 
   const finish = () => {
     if (completedRef.current) return;
     completedRef.current = true;
+    clearWatchdogs();
     onComplete();
   };
 
@@ -196,10 +275,80 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
       setStage("entering");
       video.currentTime = 0;
       void attemptPlay(video, token);
+
+      // WATCHDOG: start fresh for this run of the scene. See the block
+      // comment above STALL_CHECK_MS for why this exists at all.
+      clearWatchdogs();
+      stallStrikesRef.current = 0;
+      lastCurrentTimeRef.current = 0;
+      userPausedRef.current = false;
+
+      watchdogIntervalRef.current = setInterval(() => {
+        if (completedRef.current) {
+          clearWatchdogs();
+          return;
+        }
+        const v = videoRef.current;
+        if (!v) return;
+        if (userPausedRef.current) return; // an intentional pause, not a stall
+        if (stageRef.current === "holding" || stageRef.current === "fading" || stageRef.current === "done") {
+          clearWatchdogs();
+          return;
+        }
+
+        const progressed = v.currentTime > lastCurrentTimeRef.current + 0.05;
+        lastCurrentTimeRef.current = v.currentTime;
+
+        if (progressed && !v.paused) {
+          stallStrikesRef.current = 0;
+          return;
+        }
+
+        stallStrikesRef.current += 1;
+
+        if (stallStrikesRef.current === STALL_STRIKES_TO_RETRY && !retriedRef.current) {
+          // eslint-disable-next-line no-console
+          console.warn("[VideoScene] no playback progress detected — reloading and retrying once:", {
+            paused: v.paused,
+            readyState: v.readyState,
+            networkState: v.networkState,
+            currentTime: v.currentTime,
+          });
+          retriedRef.current = true;
+          const retryToken = ++runTokenRef.current;
+          v.load();
+          v.currentTime = 0;
+          void attemptPlay(v, retryToken);
+        } else if (stallStrikesRef.current >= STALL_STRIKES_TO_FINISH) {
+          // eslint-disable-next-line no-console
+          console.warn("[VideoScene] still no playback progress after retry — skipping scene so the timeline can continue.");
+          if (!endedFiredRef.current) {
+            endedFiredRef.current = true;
+            onEnded?.();
+          }
+          finish();
+        }
+      }, STALL_CHECK_MS);
+
+      // WATCHDOG: absolute ceiling. Whatever else happens (a retry that
+      // itself stalls, a stage stuck on "entering", anything), the scene
+      // is force-finished by this point so the timeline can never be
+      // stuck here permanently.
+      hardTimeoutRef.current = setTimeout(() => {
+        if (completedRef.current) return;
+        // eslint-disable-next-line no-console
+        console.warn("[VideoScene] hard timeout reached — force-finishing the scene.");
+        if (!endedFiredRef.current) {
+          endedFiredRef.current = true;
+          onEnded?.();
+        }
+        finish();
+      }, HARD_TIMEOUT_MS);
     } else {
       runTokenRef.current++; // invalidate any in-flight attempt from this run
       if (holdTimer.current) clearTimeout(holdTimer.current);
       if (fadeTimer.current) clearTimeout(fadeTimer.current);
+      clearWatchdogs();
       video.pause();
       setStage("idle");
     }
@@ -305,6 +454,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     () => () => {
       if (holdTimer.current) clearTimeout(holdTimer.current);
       if (fadeTimer.current) clearTimeout(fadeTimer.current);
+      clearWatchdogs();
     },
     [],
   );
@@ -334,11 +484,13 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
     }
     if (stage !== "entering" && stage !== "playing") return;
     if (video.paused) {
+      userPausedRef.current = false;
       void video.play().catch((err) => {
         // eslint-disable-next-line no-console
         console.error("[VideoScene DEBUG] manual resume play() FAILED:", err);
       });
     } else {
+      userPausedRef.current = true;
       video.pause();
     }
   };
@@ -400,6 +552,7 @@ const handleSceneTap = (e: React.MouseEvent) => {
         completedRef.current = false;
         endedFiredRef.current = false;
         retriedRef.current = false;
+        clearWatchdogs();
         setNeedsUnmute(false);
         setStage("idle");
       },
