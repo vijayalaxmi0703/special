@@ -1,11 +1,13 @@
 import { n as __toESM } from "../_runtime.mjs";
 import { n as AnimatePresence, r as performance_default, t as motion } from "../_libs/framer-motion+[...].mjs";
 import { n as require_jsx_runtime, r as require_react } from "../_libs/react+tanstack__react-query.mjs";
+import { g as require_react_dom } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as Volume2, r as RotateCcw, t as VolumeX } from "../_libs/lucide-react.mjs";
 import { t as createClient } from "../_libs/supabase__supabase-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-DvD9pdqN.js
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-BFL5gGNY.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
+var import_react_dom = require_react_dom();
 var P = {
 	leftEar: {
 		left: 172,
@@ -125,23 +127,49 @@ if (typeof window !== "undefined") {
 	preloadImages(CRITICAL_BUNNY_ASSETS);
 	("requestIdleCallback" in window ? (cb) => window.requestIdleCallback(cb) : (cb) => window.setTimeout(cb, 1500))(() => preloadImages([CROWN_ASSET]));
 }
-/** Hook: returns the mouth image src to show right now. Advances through
-MOUTH_FRAMES on an interval while `talking` is true; snaps back to (and
-stays on) the closed frame the instant `talking` goes false. This is
-the entire "speaking animation" — no transforms involved. */
+/** Hook: returns the mouth image src to show right now.
+
+ARCHITECTURE FIX (root cause of "mouth animation stops/freezes" +
+a chunk of the general mobile lag): this used to be driven by
+`talkClockMs`, a prop mirroring App.tsx's master `elapsed` clock,
+which meant the *entire* Bunny tree re-rendered on every single one
+of App's 60fps clock ticks for as long as `talking` was true (see
+the old bunnyPropsAreEqual comparator, which deliberately let those
+renders through). App.tsx's clock is now ref-based and no longer
+ticks React state every frame — see App.tsx's "ONE clock" comment —
+so this hook can no longer piggyback on it, and shouldn't want to:
+tying mouth-frame stepping to the *entire app's* render cadence was
+always the wrong coupling. Instead this hook owns a small,
+self-contained rAF loop of its own, entirely local to this
+component. It reads real elapsed time each frame but — critically —
+only calls setState when the discrete frame INDEX actually changes
+(every ~220ms), not on every rAF tick. That's roughly a 13x cut in
+render frequency versus the old approach, and it's fully isolated:
+a stall or hiccup anywhere else in the app can't pause this loop,
+and this loop re-rendering can never cascade up into App or its
+siblings — only this one component's local state changes. */
 function useMouthFrame(talking) {
-	const [frame, setFrame] = (0, import_react.useState)(0);
+	const [frame, setFrame] = (0, import_react.useState)(MOUTH_CLOSED);
 	(0, import_react.useEffect)(() => {
 		if (!talking) {
-			setFrame(0);
+			setFrame(MOUTH_CLOSED);
 			return;
 		}
-		const id = setInterval(() => {
-			setFrame((f) => (f + 1) % MOUTH_FRAMES.length);
-		}, MOUTH_STEP_MS);
-		return () => clearInterval(id);
+		let raf = 0;
+		let lastIdx = -1;
+		const start = performance_default.now();
+		const step = (now) => {
+			const idx = Math.floor((now - start) / MOUTH_STEP_MS) % MOUTH_FRAMES.length;
+			if (idx !== lastIdx) {
+				lastIdx = idx;
+				setFrame(MOUTH_FRAMES[idx]);
+			}
+			raf = requestAnimationFrame(step);
+		};
+		raf = requestAnimationFrame(step);
+		return () => cancelAnimationFrame(raf);
 	}, [talking]);
-	return talking ? MOUTH_FRAMES[frame] : MOUTH_CLOSED;
+	return frame;
 }
 /** MOUTH POSITION FIX: the reported "whole mouth moving up/down" bug is
 the mouth's own container box changing SIZE when the src swaps
@@ -365,7 +393,7 @@ function IntroBunny({ phase, peekX, peekTilt, blink }) {
 		}, "intro-arm-group") })]
 	});
 }
-function Bunny({ pose = "idle", look = "viewer", talking = false, walking = false, smiling = false, holdingCrown = false, introPhase, peekX, peekTilt = 0, walkInFrom }) {
+function BunnyImpl({ pose = "idle", look = "viewer", talking = false, walking = false, smiling = false, holdingCrown = false, introPhase, peekX, peekTilt = 0, walkInFrom }) {
 	const [blink, setBlink] = (0, import_react.useState)(false);
 	const mouthSrc = useMouthFrame(talking);
 	const mouthBox = useMouthBoxSize(P.mouth.width);
@@ -958,6 +986,35 @@ function Bunny({ pose = "idle", look = "viewer", talking = false, walking = fals
 		})
 	});
 }
+/** MOBILE PERF FIX (general lag): App.tsx's timeline no longer ticks
+React state every animation frame (see App.tsx's "ONE clock"
+comment), and the mouth animation now owns its own tiny, local rAF
+loop (see useMouthFrame above) instead of reading a fast-changing
+prop — so this comparator no longer needs a "keep re-rendering
+every frame while talking" escape hatch. It simply skips the
+re-render whenever every prop that could change the visible output
+is unchanged. Nothing about the visual design, timing, or behavior
+changes — this only removes redundant renders where the output
+would've been pixel-identical anyway. */
+function bunnyPropsAreEqual(prev, next) {
+	if (prev.talking !== next.talking) return false;
+	return prev.pose === next.pose && prev.look === next.look && prev.walking === next.walking && prev.smiling === next.smiling && prev.holdingCrown === next.holdingCrown && prev.introPhase === next.introPhase && prev.peekX === next.peekX && prev.peekTilt === next.peekTilt && prev.walkInFrom === next.walkInFrom;
+}
+var Bunny = (0, import_react.memo)(BunnyImpl, bunnyPropsAreEqual);
+var MOBILE_BREAKPOINT = 768;
+function useIsMobile() {
+	const [isMobile, setIsMobile] = import_react.useState(void 0);
+	import_react.useEffect(() => {
+		const mql = window.matchMedia(`(max-width: 767px)`);
+		const onChange = () => {
+			setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+		};
+		mql.addEventListener("change", onChange);
+		setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+		return () => mql.removeEventListener("change", onChange);
+	}, []);
+	return !!isMobile;
+}
 function useSeeded(count, seed = 1) {
 	return (0, import_react.useMemo)(() => {
 		let s = seed;
@@ -974,9 +1031,10 @@ function useSeeded(count, seed = 1) {
 		}));
 	}, [count, seed]);
 }
-function Background({ showMoon = false, warm = false }) {
-	const stars = useSeeded(70, 7);
-	const motes = useSeeded(18, 31);
+function BackgroundImpl({ showMoon = false, warm = false }) {
+	const isMobile = useIsMobile();
+	const stars = useSeeded(isMobile ? 42 : 70, 7);
+	const motes = useSeeded(isMobile ? 11 : 18, 31);
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "pointer-events-none absolute inset-0 overflow-hidden",
 		children: [
@@ -1080,7 +1138,8 @@ function Background({ showMoon = false, warm = false }) {
 		]
 	});
 }
-function Dialogue({ line, position = "bottom", tone = "soft" }) {
+var Background = (0, import_react.memo)(BackgroundImpl);
+function DialogueImpl({ line, position = "bottom", tone = "soft" }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: `pointer-events-none absolute inset-x-0 z-50 flex justify-center px-6 ${position === "bottom" ? "bottom-[6vh]" : "top-[12vh]"}`,
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
@@ -1116,15 +1175,17 @@ function Dialogue({ line, position = "bottom", tone = "soft" }) {
 		})
 	});
 }
-function CrownGlow({ active }) {
-	const sparks = (0, import_react.useMemo)(() => Array.from({ length: 14 }, (_, i) => {
-		const angle = i / 14 * Math.PI * 2;
+var Dialogue = (0, import_react.memo)(DialogueImpl);
+function CrownGlowImpl({ active }) {
+	const sparkCount = useIsMobile() ? 9 : 14;
+	const sparks = (0, import_react.useMemo)(() => Array.from({ length: sparkCount }, (_, i) => {
+		const angle = i / sparkCount * Math.PI * 2;
 		return {
 			x: Math.cos(angle) * 120,
 			y: Math.sin(angle) * 120,
 			d: i * .05
 		};
-	}), []);
+	}), [sparkCount]);
 	if (!active) return null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "pointer-events-none absolute left-1/2 top-[13%] z-30 -translate-x-1/2",
@@ -1184,6 +1245,7 @@ function CrownGlow({ active }) {
 		}, i))]
 	});
 }
+var CrownGlow = (0, import_react.memo)(CrownGlowImpl);
 /**
 * QuestionCard — the one deliberately non-linear beat in the whole film:
 * "I believe you are one of the best lecturers a student could ask for.
@@ -1222,10 +1284,10 @@ function CrownGlow({ active }) {
 * and the question text — is unchanged from before.
 */
 var REACTIONS = [
-	"Wait— you actually clicked No?.Hmm… I knew you might say that.But unfortunately, I don't think I'm going to accept that answer.🤭",
-	"I'll pretend I didn't see that.,reconsider mam",
+	"Wait— No.you actually clicked No?.Hmm… I knew you might say that.But unfortunately, I don't think I'm going to accept that answer.🤭",
+	"I'll just pretend I didn't see that. Go on… reconsider, Mam",
 	"Due to this bunny respectfully disagreeing, the No button has been politely dismissed.😄",
-	"Well… I suppose there's only one option left now, Mam.😁hehe"
+	"Well… I suppose there's only one option left now, Mam.hehe"
 ];
 var MAX_NO_ATTEMPTS = REACTIONS.length;
 var REACTION_HOLD_MS = 5200;
@@ -1329,6 +1391,22 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 	const reactionTimer = (0, import_react.useRef)(null);
 	const hideTimer = (0, import_react.useRef)(null);
 	const lastDodgeIndex = (0, import_react.useRef)(-1);
+	/** MOBILE FIX: guards against a single physical tap producing more
+	than one attempt. On mobile, `pointerdown` and (on browsers/
+	WebViews that still dispatch legacy touch events alongside
+	Pointer Events) `touchstart` can both fire for the same finger
+	contact, and a touch also synthesizes a `pointerenter` right
+	before its `pointerdown` — so a naive "call handleNoAttempt from
+	every one of these events" setup (the previous implementation)
+	could register 2-3 attempts from one tap. The button's handlers
+	below are already narrowed (onPointerEnter only reacts to real
+	mouse hover; onTouchStart is removed entirely since
+	onPointerDown already covers touch on every modern mobile
+	browser), but this timestamp guard is kept as defense-in-depth
+	against any remaining duplicate-event combination. A real second
+	tap is never this close together, so the window is short. */
+	const lastAttemptAtRef = (0, import_react.useRef)(0);
+	const ATTEMPT_DEDUPE_MS = 120;
 	(0, import_react.useEffect)(() => () => {
 		if (reactionTimer.current) clearTimeout(reactionTimer.current);
 		if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -1341,6 +1419,9 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 	const noInteractive = attempts < MAX_NO_ATTEMPTS;
 	const handleNoAttempt = () => {
 		if (!noInteractive) return;
+		const now = typeof performance_default !== "undefined" && typeof performance_default.now === "function" ? performance_default.now() : Date.now();
+		if (now - lastAttemptAtRef.current < ATTEMPT_DEDUPE_MS) return;
+		lastAttemptAtRef.current = now;
 		const next = attempts + 1;
 		setAttempts(next);
 		onAttempt(next);
@@ -1369,7 +1450,7 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 		exit: { opacity: 0 },
 		transition: { duration: .6 },
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "pointer-events-auto relative w-[92vw] max-w-sm rounded-[26px] p-[1.5px] shadow-2xl backdrop-blur-md",
+			className: "pointer-events-auto relative w-[92vw] max-w-sm rounded-[26px] p-[1.5px] shadow-2xl backdrop-blur-sm sm:backdrop-blur-md",
 			style: {
 				maxHeight: `34vh`,
 				background: `linear-gradient(160deg, ${COLOR.outerFrom}, ${COLOR.outerTo})`,
@@ -1388,7 +1469,7 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 					children: "🌙"
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "flex h-full flex-col justify-center gap-3 rounded-[24px] border border-dashed px-4 py-4 text-center backdrop-blur-md sm:gap-4 sm:px-6 sm:py-5",
+					className: "flex h-full flex-col justify-center gap-3 rounded-[24px] border border-dashed px-4 py-4 text-center backdrop-blur-sm sm:gap-4 sm:px-6 sm:py-5 sm:backdrop-blur-md",
 					style: {
 						backgroundColor: "rgba(20, 10, 40, 0.55)",
 						borderColor: COLOR.innerBorder
@@ -1418,9 +1499,10 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
 							mode: "popLayout",
 							children: !noHidden && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.button, {
-								onPointerEnter: handleNoAttempt,
+								onPointerEnter: (e) => {
+									if (e.pointerType === "mouse") handleNoAttempt();
+								},
 								onPointerDown: handleNoAttempt,
-								onTouchStart: handleNoAttempt,
 								onClick: (e) => e.preventDefault(),
 								initial: false,
 								animate: {
@@ -1464,379 +1546,300 @@ function QuestionCard({ questionText, onYes, onAttempt }) {
 		})
 	});
 }
-var HOLD_MS = 1500;
-var FADE_MS = 900;
+/** How long the scene holds on the final frame after `ended` before
+calling onComplete — a deliberate, short visual beat, NOT a
+playback-progress mechanism. Native `ended` has already fired by
+the time this runs; this timer only ever delays onComplete, it can
+never bring it forward or substitute for a real event. */
+var END_HOLD_MS = 900;
+/** Throttle window for the very-high-frequency `progress`/`timeupdate`
+debug logs, so the logging itself never becomes a mobile perf cost. */
+var LOG_THROTTLE_MS = 1e3;
 var VideoScene = (0, import_react.forwardRef)(function VideoScene({ active, onComplete, onEnded, frameMaxHVh = 75, frameBottomVh = 3 }, ref) {
 	const videoRef = (0, import_react.useRef)(null);
 	const [stage, setStage] = (0, import_react.useState)("idle");
-	const [needsUnmute, setNeedsUnmute] = (0, import_react.useState)(false);
+	const [isMuted, setIsMuted] = (0, import_react.useState)(true);
 	const completedRef = (0, import_react.useRef)(false);
 	const endedFiredRef = (0, import_react.useRef)(false);
-	const holdTimer = (0, import_react.useRef)(null);
-	const fadeTimer = (0, import_react.useRef)(null);
-	/** Bumped every time `active` becomes true; async play() attempts
-	check this so a rapid active->inactive->active cycle can never
-	apply a stale attempt's result. */
-	const runTokenRef = (0, import_react.useRef)(0);
-	/** Mirrors `active` for the native ended/error listeners, which are
-	attached once (mount-only) since the element itself never
-	unmounts anymore. */
+	const endHoldTimer = (0, import_react.useRef)(null);
+	/** Mirrors `active` for the native event listeners, which are
+	attached exactly once (mount-only) since the <video> element
+	itself is persistent for the app's whole lifetime and never
+	recreated. */
 	const activeRef = (0, import_react.useRef)(active);
 	(0, import_react.useEffect)(() => {
 		activeRef.current = active;
 	}, [active]);
-	/** True once a silent, gesture-linked play()+pause() has actually
-	succeeded on this element — see `prime()` below. */
-	const primedRef = (0, import_react.useRef)(false);
-	/** Guards the one-shot retry-on-error below so a genuinely broken
-	video can still fall through to finish() rather than retrying
-	forever. Reset every time `active` newly becomes true. */
-	const retriedRef = (0, import_react.useRef)(false);
-	const finish = () => {
-		if (completedRef.current) return;
-		completedRef.current = true;
-		onComplete();
-	};
-	/** TEMPORARY DIAGNOSTICS — safe to delete once the audio path is
-	confirmed working on the real target device/browser; only reads
-	state, never changes behavior. */
-	const logVideoState = (label) => {
+	const lastProgressLogRef = (0, import_react.useRef)(0);
+	const lastTimeUpdateLogRef = (0, import_react.useRef)(0);
+	/** ITEM 15 — DEBUG LOGGING: every call logs the full diagnostic
+	snapshot the brief asks for, so a real mobile failure can be
+	classified afterward as (A) autoplay policy, (B) buffering/
+	network, (C) decode, (D) JS freeze, (E) element reset, or
+	(F) React re-render interference. */
+	const logEvent = (label, extra) => {
 		const video = videoRef.current;
-		if (!video) return;
-		console.log(`[VideoScene DEBUG] ${label}`, {
-			muted: video.muted,
-			volume: video.volume,
-			paused: video.paused,
-			readyState: video.readyState,
-			currentSrc: video.currentSrc,
-			currentTime: video.currentTime,
-			duration: video.duration,
-			networkState: video.networkState,
-			error: video.error ? {
-				code: video.error.code,
-				message: video.error.message
-			} : null
+		console.log(`[VIDEO] ${label}`, {
+			currentTime: video?.currentTime,
+			duration: video?.duration,
+			readyState: video?.readyState,
+			networkState: video?.networkState,
+			paused: video?.paused,
+			muted: video?.muted,
+			errorCode: video?.error?.code,
+			errorMessage: video?.error?.message,
+			...extra
 		});
 	};
-	const attemptPlay = async (video, token) => {
-		logVideoState("before unmuted play() attempt");
-		try {
-			video.muted = false;
-			video.volume = 1;
-			await video.play();
-			if (runTokenRef.current !== token) return;
-			logVideoState("unmuted play() resolved");
-			setStage("playing");
-		} catch (err) {
-			console.error("[VideoScene DEBUG] unmuted play() REJECTED:", err);
-			try {
-				video.muted = true;
-				await video.play();
-				if (runTokenRef.current !== token) return;
-				logVideoState("fallback muted play() resolved (needs tap-to-unmute)");
-				setNeedsUnmute(true);
-				setStage("playing");
-			} catch (err2) {
-				console.error("[VideoScene DEBUG] fallback muted play() ALSO REJECTED — skipping scene:", err2);
-				if (runTokenRef.current !== token) return;
-				finish();
-			}
-		}
+	/** ITEM 9 — prevents overlapping/duplicate `play()` calls. Set right
+	before `video.play()` is invoked, cleared either by the native
+	`playing` event (the normal, successful path) or by a rejected
+	promise (so a later native event/gesture can try again). Never
+	cleared by a timer. */
+	const playAttemptRef = (0, import_react.useRef)(false);
+	/** ITEMS 2/3/9/12 — the ONLY function in this file that calls
+	`video.play()`. No `readyState` gate anymore: the browser's own
+	native media pipeline is trusted to handle buffering itself once
+	`play()` has been requested — `waiting`/`canplay`/`playing` then
+	reflect its actual state. Safe to call from multiple triggers
+	(the `active` effect, `loadedmetadata`, `canplay`) because it's
+	itself a no-op unless the scene is active, the element exists,
+	no attempt is already in flight, and the video isn't already
+	playing. */
+	const attemptPlay = () => {
+		const video = videoRef.current;
+		if (!video) return;
+		if (!activeRef.current) return;
+		if (playAttemptRef.current) return;
+		if (!video.paused) return;
+		video.muted = true;
+		video.defaultMuted = true;
+		video.playsInline = true;
+		setIsMuted(true);
+		playAttemptRef.current = true;
+		logEvent("play requested");
+		video.play().then(() => {
+			if (!activeRef.current) return;
+			logEvent("play success");
+		}).catch((err) => {
+			playAttemptRef.current = false;
+			logEvent("play blocked", { err: String(err) });
+		});
 	};
 	(0, import_react.useEffect)(() => {
 		const video = videoRef.current;
 		if (!video) return;
 		if (active) {
-			const token = ++runTokenRef.current;
+			logEvent("scene active");
 			completedRef.current = false;
 			endedFiredRef.current = false;
-			retriedRef.current = false;
-			setNeedsUnmute(false);
-			setStage("entering");
-			video.currentTime = 0;
-			attemptPlay(video, token);
+			setStage((s) => s === "idle" ? "loading" : s);
+			attemptPlay();
 		} else {
-			runTokenRef.current++;
-			if (holdTimer.current) clearTimeout(holdTimer.current);
-			if (fadeTimer.current) clearTimeout(fadeTimer.current);
 			video.pause();
+			playAttemptRef.current = false;
 			setStage("idle");
 		}
 	}, [active]);
 	(0, import_react.useEffect)(() => {
 		const video = videoRef.current;
 		if (!video) return;
+		const handleLoadedMetadata = () => {
+			logEvent("loadedmetadata");
+			if (activeRef.current) attemptPlay();
+		};
+		const handleCanPlay = () => {
+			logEvent("canplay");
+			if (activeRef.current && video.paused) attemptPlay();
+		};
+		const handlePlaying = () => {
+			logEvent("playing", { currentTime: video.currentTime });
+			playAttemptRef.current = false;
+			setStage("playing");
+		};
+		const handleWaiting = () => {
+			logEvent("waiting", { currentTime: video.currentTime });
+			if (activeRef.current) setStage("buffering");
+		};
+		const handleStalled = () => {
+			logEvent("stalled", { currentTime: video.currentTime });
+		};
+		const handleProgress = () => {
+			const now = performance_default.now();
+			if (now - lastProgressLogRef.current < LOG_THROTTLE_MS) return;
+			lastProgressLogRef.current = now;
+			logEvent("progress");
+		};
+		const handleTimeUpdate = () => {
+			const now = performance_default.now();
+			if (now - lastTimeUpdateLogRef.current < LOG_THROTTLE_MS) return;
+			lastTimeUpdateLogRef.current = now;
+			logEvent("timeupdate");
+		};
 		const handleEnded = () => {
-			if (!activeRef.current) return;
-			logVideoState("native `ended` event fired");
+			logEvent("ended", { currentTime: video.currentTime });
+			setStage("ended");
 			if (!endedFiredRef.current) {
 				endedFiredRef.current = true;
 				onEnded?.();
 			}
-			setStage("holding");
-			holdTimer.current = setTimeout(() => {
-				setStage("fading");
-				fadeTimer.current = setTimeout(() => {
-					setStage("done");
-					finish();
-				}, FADE_MS);
-			}, HOLD_MS);
+			endHoldTimer.current = setTimeout(() => {
+				if (completedRef.current) return;
+				completedRef.current = true;
+				onComplete();
+			}, END_HOLD_MS);
 		};
-		/** ROOT CAUSE OF "video scene skipped on mobile": this element has
-		had `src="/video/memory.mp4"` and `preload="auto"` set since
-		mount (so the browser starts fetching/buffering the 9MB memory
-		clip in the background, long before the video scene is ever
-		reached — which is exactly what we want for preloading). But
-		this `error` listener is attached ONCE for the component's
-		entire lifetime and, until this fix, reacted to ANY `error`
-		event by immediately calling `finish()` — which flips
-		`videoReleased` in App.tsx permanently true.
-		
-		On a flaky/slow mobile connection it's common for that
-		background preload fetch to hiccup (an aborted range request,
-		a transient network error, the OS deprioritizing/pausing an
-		off-screen media element's buffering, mobile Safari's stricter
-		concurrent-media-element limits when the bg/hug <audio>
-		elements are also preloading) and fire a native `error` event
-		on the <video> element WHILE THE VIDEO SCENE ISN'T EVEN ACTIVE
-		YET. Because `completedRef`/`videoReleased` latch permanently
-		(only reset by replay()), that one stray early error silently
-		marked the whole scene "already finished" minutes before the
-		timeline ever got there — so when the timeline actually
-		reached the video phase, App.tsx's gate saw `videoReleased`
-		already true and let `elapsed` sail straight through the
-		video's slot in a single frame, i.e. the scene was skipped
-		with nothing ever visibly playing. Desktop's faster, steadier
-		connections rarely if ever trigger this; mobile does, reliably.
-		
-		Fix: only ever treat a real `error` event as "the video failed,
-		move on" while the video scene is actually the active phase
-		(mirrors the existing `activeRef` guard already used in
-		`handleEnded` above). An error that fires during background
-		preloading, before the scene is reached, is now just logged
-		and ignored — the browser will still have another chance to
-		(re)buffer by the time `active` actually flips true, since the
-		`active` effect calls `attemptPlay()` again at that point
-		regardless of any earlier hiccup. */
 		const handleError = () => {
+			const err = video.error;
+			logEvent("error", { errorCodeName: err?.code === 1 ? "MEDIA_ERR_ABORTED" : err?.code === 2 ? "MEDIA_ERR_NETWORK" : err?.code === 3 ? "MEDIA_ERR_DECODE" : err?.code === 4 ? "MEDIA_ERR_SRC_NOT_SUPPORTED" : "none" });
+			if (!(err?.code === 4 || video.networkState === 3)) {
+				logEvent("error treated as transient — scene stays visible, no action taken");
+				return;
+			}
 			if (!activeRef.current) {
-				console.warn("[VideoScene] ignored a pre-scene media error (likely a background preload hiccup):", video.error);
+				logEvent("permanent error ignored — scene isn't active yet, will re-evaluate when it becomes active");
 				return;
 			}
-			if (!retriedRef.current) {
-				retriedRef.current = true;
-				console.warn("[VideoScene] media error during the active scene — retrying once:", video.error);
-				const token = ++runTokenRef.current;
-				video.load();
-				attemptPlay(video, token);
-				return;
-			}
+			logEvent("permanent, unrecoverable media error while active — completing the scene");
 			if (!endedFiredRef.current) {
 				endedFiredRef.current = true;
 				onEnded?.();
 			}
-			finish();
+			if (!completedRef.current) {
+				completedRef.current = true;
+				onComplete();
+			}
 		};
+		video.addEventListener("loadedmetadata", handleLoadedMetadata);
+		video.addEventListener("canplay", handleCanPlay);
+		video.addEventListener("playing", handlePlaying);
+		video.addEventListener("waiting", handleWaiting);
+		video.addEventListener("stalled", handleStalled);
+		video.addEventListener("progress", handleProgress);
+		video.addEventListener("timeupdate", handleTimeUpdate);
 		video.addEventListener("ended", handleEnded);
 		video.addEventListener("error", handleError);
 		return () => {
+			video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+			video.removeEventListener("canplay", handleCanPlay);
+			video.removeEventListener("playing", handlePlaying);
+			video.removeEventListener("waiting", handleWaiting);
+			video.removeEventListener("stalled", handleStalled);
+			video.removeEventListener("progress", handleProgress);
+			video.removeEventListener("timeupdate", handleTimeUpdate);
 			video.removeEventListener("ended", handleEnded);
 			video.removeEventListener("error", handleError);
 		};
 	}, []);
 	(0, import_react.useEffect)(() => () => {
-		if (holdTimer.current) clearTimeout(holdTimer.current);
-		if (fadeTimer.current) clearTimeout(fadeTimer.current);
+		if (endHoldTimer.current) clearTimeout(endHoldTimer.current);
 	}, []);
-	const handleUnmute = () => {
+	/** The whole-scene wrapper is deliberately NOT a pause/resume target
+	anymore — a general tap on the video area does nothing to
+	playback. The only interactive control is the small dedicated
+	unmute button below (`handleUnmute`), which is the sole thing
+	that can touch this element's play/pause/muted state once the
+	scene is active. This avoids the exact failure mode a browser-
+	generated synthetic click (firing after a touch elsewhere on the
+	screen) could otherwise trigger — an accidental pause the user
+	never intended. */
+	const handleUnmute = (e) => {
+		e.stopPropagation();
 		const video = videoRef.current;
-		if (!video) return;
+		if (!video || !video.muted) return;
 		video.muted = false;
-		video.volume = 1;
-		setNeedsUnmute(false);
-		video.play().catch((err) => {
-			console.log("[VideoScene DEBUG] handleUnmute play() rejected:", err);
-		});
+		video.defaultMuted = false;
+		setIsMuted(false);
+		logEvent("unmuted via user gesture");
+		if (video.paused) video.play().catch((err) => logEvent("resume-with-sound play() rejected", { err: String(err) }));
 	};
-	/** Shared pause/resume core — used by both the on-frame click handler
-	and the imperative `togglePauseResume()` (which App.tsx's
-	tap-to-advance "skip" calls for clicks on the middle of the
-	screen during the video scene). */
-	const handleTogglePauseResume = () => {
-		const video = videoRef.current;
-		if (!video) return;
-		if (needsUnmute) {
-			handleUnmute();
-			return;
-		}
-		if (stage !== "entering" && stage !== "playing") return;
-		if (video.paused) video.play().catch((err) => {
-			console.error("[VideoScene DEBUG] manual resume play() FAILED:", err);
-		});
-		else video.pause();
-	};
-	const handleSceneTap = (e) => {
-		e.stopPropagation();
-		if (needsUnmute) {
-			handleUnmute();
-			return;
-		}
-		handleTogglePauseResume();
-	};
-	const handleFrameClick = (e) => {
-		e.stopPropagation();
-		handleTogglePauseResume();
-	};
+	/** Guards `prime()` so it only ever runs its play/pause probe once —
+	called from App.tsx's one-time first-gesture handler. */
+	const primedRef = (0, import_react.useRef)(false);
 	(0, import_react.useImperativeHandle)(ref, () => ({
-		/** Silent, gesture-linked play()+pause() cycle so this exact
-		<video> element is granted gesture-based playback permission
-		ahead of time — see the top-of-file note. Safe to call from
-		every gesture; a no-op once already primed. */
-		prime: () => {
-			if (primedRef.current) return;
-			const video = videoRef.current;
-			if (!video) return;
-			video.muted = false;
-			video.volume = 0;
-			video.play().then(() => {
-				primedRef.current = true;
-				video.pause();
-				video.currentTime = 0;
-			}).catch(() => {
-				video.pause();
-			});
-		},
-		togglePauseResume: handleTogglePauseResume,
+		/** Replay: `.load()` is deliberately NOT called here anymore — the
+		source hasn't changed, so there's nothing `.load()` would fix
+		that pause()+currentTime=0 doesn't already do, and calling it
+		resets the whole media pipeline (decoder/buffer/network
+		request) for no reason. */
 		reset: () => {
 			const video = videoRef.current;
 			if (video) {
 				video.pause();
-				video.load();
 				video.currentTime = 0;
 			}
-			runTokenRef.current++;
 			completedRef.current = false;
 			endedFiredRef.current = false;
-			retriedRef.current = false;
-			setNeedsUnmute(false);
+			if (endHoldTimer.current) clearTimeout(endHoldTimer.current);
+			setIsMuted(true);
 			setStage("idle");
-		}
-	}), [needsUnmute, stage]);
-	const fadingOut = stage === "fading" || stage === "done";
-	const visible = active && stage !== "idle" && stage !== "done";
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
-		className: "absolute inset-0 z-40 flex items-end justify-center px-5",
-		style: {
-			paddingBottom: `${frameBottomVh}vh`,
-			pointerEvents: active ? "auto" : "none"
 		},
-		onClick: handleSceneTap,
-		animate: { opacity: visible ? 1 : 0 },
-		transition: { duration: .8 },
-		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
-				className: "absolute inset-0 bg-black",
-				animate: { opacity: visible && !fadingOut ? .45 : 0 },
-				transition: { duration: 1 }
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "pointer-events-none absolute inset-0 overflow-hidden",
-				children: Array.from({ length: 14 }).map((_, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
-					className: "absolute rounded-full bg-gold/70",
-					style: {
-						left: `${6 + i * 37 % 90}%`,
-						width: i % 3 === 0 ? 4 : 2,
-						height: i % 3 === 0 ? 4 : 2,
-						filter: "blur(0.5px)"
-					},
-					initial: {
-						y: "100%",
-						opacity: 0
-					},
-					animate: {
-						y: visible && !fadingOut ? ["100%", "-10%"] : "100%",
-						opacity: visible && !fadingOut ? [
-							0,
-							.9,
-							0
-						] : 0
-					},
-					transition: {
-						duration: 6 + i % 5,
-						delay: i * .4,
-						repeat: visible && !fadingOut ? Infinity : 0,
-						ease: "easeOut"
-					}
-				}, i))
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
-				className: "pointer-events-auto relative w-[96vw] max-w-3xl rounded-[22px] p-[2px]",
-				style: { background: "linear-gradient(160deg, rgba(247,209,158,0.55), rgba(232,168,255,0.35))" },
-				onClick: handleFrameClick,
-				animate: {
-					opacity: visible ? fadingOut ? 0 : 1 : 0,
-					scale: visible ? fadingOut ? .94 : 1 : .88
-				},
-				transition: {
-					duration: fadingOut ? .9 : 1.1,
-					ease: [
-						.22,
-						1,
-						.36,
-						1
-					]
-				},
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
-					className: "pointer-events-none absolute -inset-1 rounded-[26px]",
-					style: { background: "radial-gradient(closest-side, rgba(232,168,255,0.45), transparent 70%)" },
-					animate: { opacity: visible && !fadingOut ? [
-						.35,
-						.75,
-						.35
-					] : 0 },
-					transition: {
-						duration: 3.2,
-						repeat: visible && !fadingOut ? Infinity : 0,
-						ease: "easeInOut"
-					}
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "relative overflow-hidden rounded-[20px] backdrop-blur-md",
-					style: {
-						backgroundColor: "rgba(20, 10, 40, 0.35)",
-						border: "1px solid rgba(247, 209, 158, 0.25)",
-						boxShadow: "0 0 40px rgba(232,168,255,0.3), 0 10px 40px rgba(0,0,0,0.5)"
-					},
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
-						ref: videoRef,
-						src: "/video/memory.mp4",
-						playsInline: true,
-						preload: "auto",
-						className: "block w-full",
-						style: {
-							objectFit: "contain",
-							maxHeight: `${frameMaxHVh}vh`
-						}
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: needsUnmute && (stage === "entering" || stage === "playing") && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.button, {
-						onClick: (e) => {
-							e.stopPropagation();
-							handleUnmute();
-						},
-						initial: {
-							opacity: 0,
-							y: 8
-						},
-						animate: {
-							opacity: 1,
-							y: 0
-						},
-						exit: { opacity: 0 },
-						className: "absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream backdrop-blur-sm",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeX, { size: 14 }), " Tap for sound"]
-					}, "unmute") })]
-				})]
-			})
-		]
+		/** Called once, from App.tsx's first-gesture handler, well before
+		the video scene itself is ever reached. Grants this specific
+		<video> element its own per-element gesture-activation credit
+		(some mobile engines track this per element, same as the
+		background/hug <audio> priming) — a brief muted play+pause
+		probe, immediately rewound back to 0, so it leaves no visible
+		or audible trace and doesn't compete with the actual scene's
+		own `startPlayback()` later. Never sets `muted = false`, never
+		touches `volume`. A no-op if already primed or if the scene
+		has since become active (never pauses genuinely-active
+		playback). */
+		prime: () => {
+			const video = videoRef.current;
+			if (!video || primedRef.current || activeRef.current) return;
+			video.muted = true;
+			video.defaultMuted = true;
+			video.playsInline = true;
+			const p = video.play();
+			if (p && typeof p.then === "function") p.then(() => {
+				if (activeRef.current) return;
+				video.pause();
+				video.currentTime = 0;
+				primedRef.current = true;
+				logEvent("prime success");
+			}).catch((err) => {
+				logEvent("prime blocked", { err: String(err) });
+			});
+		}
+	}), []);
+	const visible = active && stage !== "idle";
+	const videoNode = /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+		ref: videoRef,
+		src: "/video/memory.mp4",
+		playsInline: true,
+		muted: isMuted,
+		preload: "none",
+		controls: false,
+		style: {
+			position: "fixed",
+			left: "50%",
+			bottom: `${frameBottomVh}vh`,
+			transform: "translateX(-50%)",
+			display: "block",
+			width: "96vw",
+			maxWidth: "768px",
+			maxHeight: `${frameMaxHVh}vh`,
+			objectFit: "contain",
+			zIndex: 9999,
+			visibility: visible ? "visible" : "hidden"
+		}
 	});
+	const unmuteButton = isMuted && (stage === "playing" || stage === "buffering") && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+		type: "button",
+		onPointerDown: handleUnmute,
+		style: {
+			position: "fixed",
+			right: "16px",
+			bottom: `calc(${frameBottomVh}vh + 12px)`,
+			zIndex: 1e4,
+			visibility: visible ? "visible" : "hidden"
+		},
+		className: "flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeX, { size: 14 }), " Tap for sound"]
+	});
+	if (typeof document === "undefined") return null;
+	return (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [videoNode, unmuteButton] }), document.body);
 });
 /**
 * FIX (previous version of this file crashed the whole app):
@@ -1932,6 +1935,29 @@ async function send(event, meta) {
 function track(event, meta) {
 	send(event, meta);
 }
+function getDeviceType() {
+	const ua = navigator.userAgent.toLowerCase();
+	const screenWidth = window.innerWidth;
+	if (ua.includes("ipad")) return "Tablet";
+	if (ua.includes("iphone") || ua.includes("ipod")) return "Mobile";
+	if (ua.includes("android")) {
+		if (screenWidth >= 768) return "Tablet";
+		return "Mobile";
+	}
+	if (ua.includes("windows phone") || ua.includes("iemobile")) return "Mobile";
+	if (ua.includes("tablet") || ua.includes("kindle") || ua.includes("playbook")) return "Tablet";
+	return "Desktop";
+}
+async function sendVisit() {
+	if (!supabase) return;
+	try {
+		const device_type = getDeviceType();
+		const { error } = await supabase.from("visits").insert({ device_type });
+	} catch (thrown) {}
+}
+function trackVisit() {
+	sendVisit();
+}
 /** 🚨 No teacher name was present anywhere in the project files or
 prompts I was given, and the brief is explicit not to invent one —
 so this is the one placeholder in the whole file. Fill in the real
@@ -1941,12 +1967,12 @@ var TEACHER_NAME = "Sirisha";
 var DIALOGUE_LINES = [
 	"Hi Mam... 😊",
 	"How are u?",
-	"I hope you're doing well.",
+	"hope you're doing well.",
 	"I just wanted to say a few things to you ..",
 	"So please bear with me for just a few minutes😅.",
-	"mam i could have just wished u today but..",
+	"mam i could have just wished u today through a message but..",
 	"I have spent days coding this for u cuz ...",
-	"I just wanted u to feel special today and hopefully make u smile a little"
+	"I just wanted u to feel special today and hopefully make u smile a little🤗"
 ];
 var HUG_LINES = [
 	"Thank you...",
@@ -2004,33 +2030,34 @@ neither is a caption at all, they're gates (see `answered` and
 var TEXT_LINES = {
 	talk: DIALOGUE_LINES,
 	questionSetup: ["Mam, I have a very important question…"],
-	yesAffirm: ["Yes… it's true. ✨", "You are valued, appreciated, and remembered more than you know.. 🌷"],
-	teacherImpact: ["In my eyes ur the sweetest, kindest, greatest and most amazing person💕🥰", "Your words, your patience, and the encouragement you give can stay with someone for a long time."],
+	yesAffirm: ["Yes… it's true. ✨", "You really are someone very special, Mam💗"],
+	teacherImpact: ["In my eyes ur the sweetest, kindest and most amazing person💕🥰", "You are valued, appreciated, and remembered more than you know.."],
 	pgCongrats: [
 		"And Mam… there's something else I want to congratulate you for.",
-		"Congratulations on your postgraduate journey. 🎓",
-		"Balancing your studies, college, and everything you manage at home is no small achievement.",
-		"Seeing you manage so much and still keep moving forward inspires me to work harder and do better too. ✨",
+		"Congratulations on your PhD journey MAM. 🎓",
+		"Balancing your studies, college, and everything you manage at home is no small achievement.✨",
+		"Sometimes I wonder how you manage to carry so much and still keep moving forward with the same dedication. Honestly, seeing you do that inspires me more than you know.",
 		"I hope you’re always proud of how much you’re accomplishing, even on the days when it feels difficult."
 	],
-	restMessage: ["It must get exhausting sometimes isnt it…", "So please remember to take some time for yourself too. "],
+	restMessage: ["Mamm It must get exhausting sometimes isnt it…", "So please remember to take some time for yourself too. "],
 	drMoment: [
 		"And someday…",
 		NAME_CARD,
-		"I can't wait to see 'Dr.' before your name. 😊",
+		"I can't wait to see 'Dr.' before your name.🤗",
 		"Until then, I'll be quietly cheering for you. 🤍"
 	],
-	preCrown: ["And for everything you do…", "you deserve this mam. 👑"],
-	crownFly: ["There… Now that looks perfect.Exactly where it belongs."],
+	preCrown: ["And for everything you are… and everything you do", "you deserve this mam. 👑"],
+	crownFly: ["There… Now that looks perfect.Exactly where it belongs.😊"],
 	/** VIDEO SCENE transition: the bunny "suddenly remembers something"
 	and delivers these two lines before hopping aside for the memory.
 	Ordinary reading-time-based caption phase — same mechanism as
 	preCrown/preHug, nothing new. */
-	videoTransition: ["Wait…", "Before we continue, there's something I wanted you to see. 👀"],
+	videoTransition: ["Wait mam..", "Before we continue, there's something I wanted you to see. 👀"],
 	finalAffirmation: [
-		"So please remember…",
-		"The little things you do may mean more to your students than you'll ever know. ✨",
-		"Thank you for being someone worth looking up to. 🌷"
+		"I wanted to show u that for a reason mam, Behind this little video is someone who has been quietly watching you all along…",
+		"Admiring you, learning from you, and holding onto little words and gestures you may not even remember… but someone quietly carried with them.",
+		"And without even realizing it herself, she had slowly found warmth,comfort and inspiration in you✨",
+		"Not just from the lessons you taught… but from the person you are.😊"
 	],
 	preHug: ["And this one is just for you. 🤍"],
 	hug: HUG_LINES
@@ -2349,7 +2376,22 @@ async function primeTrack(audio, isStillInactive) {
 	}
 }
 function App() {
-	const [elapsed, setElapsed] = (0, import_react.useState)(0);
+	const elapsedRef = (0, import_react.useRef)(0);
+	const resolvedRef = (0, import_react.useRef)(resolveTimeline(0));
+	const [resolved, setResolved] = (0, import_react.useState)(resolvedRef.current);
+	/** The only way `elapsed` should ever be changed, from anywhere in
+	this component (the rAF tick, skip/nudge/replay). Keeps
+	elapsedRef, resolvedRef, and React state in lockstep, and only
+	ever triggers a re-render when phase or lineIndex actually
+	differ from what's currently on screen. */
+	const applyElapsed = (next) => {
+		elapsedRef.current = next;
+		const r = resolveTimeline(next);
+		if (r.phase !== resolvedRef.current.phase || r.lineIndex !== resolvedRef.current.lineIndex) {
+			resolvedRef.current = r;
+			setResolved(r);
+		}
+	};
 	const [muted, setMuted] = (0, import_react.useState)(false);
 	const [runId, setRunId] = (0, import_react.useState)(0);
 	const [fit, setFit] = (0, import_react.useState)(() => computeFit());
@@ -2431,14 +2473,12 @@ function App() {
 	(0, import_react.useEffect)(() => {
 		const bg = new Audio("/music/background.mp4");
 		bg.loop = true;
-		bg.preload = "auto";
+		bg.preload = "metadata";
 		bg.volume = 0;
-		bg.load();
 		const hug = new Audio("/music/hug.mp4");
 		hug.loop = true;
-		hug.preload = "auto";
+		hug.preload = "metadata";
 		hug.volume = 0;
-		hug.load();
 		bgAudioRef.current = bg;
 		hugAudioRef.current = hug;
 		return () => {
@@ -2459,24 +2499,46 @@ function App() {
 	currently on screen — a gesture during the video must never
 	resume background/hug music. */
 	const tryPlayActive = () => {
-		videoSceneRef.current?.prime();
-		if (mutedRef.current) return;
-		if (videoActiveRef.current) return;
-		const active = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
-		const inactive = isHugSceneRef.current ? bgAudioRef.current : hugAudioRef.current;
-		if (active && active.paused) activateTrack(active, activeTargetRef.current);
-		if (inactive && inactive.paused) {
-			const primedTrack = inactive;
-			primeTrack(primedTrack, () => {
-				return (isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current) !== primedTrack;
-			});
+		if (!mutedRef.current && !videoActiveRef.current) {
+			const active = isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current;
+			const inactive = isHugSceneRef.current ? bgAudioRef.current : hugAudioRef.current;
+			if (active && active.paused) activateTrackWithRetry(active, activeTargetRef.current);
+			if (inactive && inactive.paused) {
+				const primedTrack = inactive;
+				primeTrack(primedTrack, () => {
+					return (isHugSceneRef.current ? hugAudioRef.current : bgAudioRef.current) !== primedTrack;
+				});
+			}
 		}
 	};
+	/** ONE-TIME media unlock: fires at most once, on the very first
+	pointerdown anywhere on the page, guarded by `mediaUnlockedRef`.
+	Starts background audio (if allowed) and primes the <video>
+	element's own gesture credit. Deliberately a single event
+	(`pointerdown`) with a ref guard, not the broader multi-event
+	passive listener below — that one exists to retry audio across
+	several gesture types/attempts; this one only ever needs to run
+	once. */
+	const mediaUnlockedRef = (0, import_react.useRef)(false);
+	(0, import_react.useEffect)(() => {
+		const handleFirstGesture = () => {
+			if (mediaUnlockedRef.current) return;
+			mediaUnlockedRef.current = true;
+			console.log("[MEDIA] first user gesture");
+			tryPlayActive();
+			videoSceneRef.current?.prime();
+		};
+		window.addEventListener("pointerdown", handleFirstGesture);
+		return () => window.removeEventListener("pointerdown", handleFirstGesture);
+	}, []);
 	(0, import_react.useEffect)(() => {
 		const events = [
 			"pointerdown",
-			"keydown",
-			"touchstart"
+			"touchstart",
+			"touchend",
+			"mouseup",
+			"click",
+			"keydown"
 		];
 		events.forEach((evt) => window.addEventListener(evt, tryPlayActive));
 		return () => events.forEach((evt) => window.removeEventListener(evt, tryPlayActive));
@@ -2492,19 +2554,20 @@ function App() {
 		const tick = (now) => {
 			const dt = now - last;
 			last = now;
-			setElapsed((e) => Math.min(gateRef.current, e + dt));
+			applyElapsed(Math.min(gateRef.current, elapsedRef.current + dt));
 			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
 	}, [runId]);
-	const { phase, lineIndex } = (0, import_react.useMemo)(() => resolveTimeline(elapsed), [elapsed]);
+	const { phase, lineIndex } = resolved;
 	(0, import_react.useEffect)(() => {
 		videoActiveRef.current = phase === "video";
 		if (phase === "video") setVideoAudioDone(false);
 	}, [phase]);
 	(0, import_react.useEffect)(() => {
 		track("page_opened");
+		trackVisit();
 	}, []);
 	(0, import_react.useEffect)(() => {
 		if (phase === "introGreeting") trackOnce("hi_shown", "hi_shown");
@@ -2622,13 +2685,9 @@ function App() {
 		if (phase === "video" && !videoAudioDone) {
 			activeTargetRef.current = 0;
 			wasVideoSilencedRef.current = true;
-			fadeAudioVolume(active, activeToken, 0, MUSIC_MUTE_FADE_MS);
-			fadeAudioVolume(inactive, inactiveToken, 0, MUSIC_MUTE_FADE_MS);
-			const pauseTimer = window.setTimeout(() => {
-				active.pause();
-				inactive.pause();
-			}, MUSIC_MUTE_FADE_MS);
-			return () => window.clearTimeout(pauseTimer);
+			active.pause();
+			inactive.pause();
+			return;
 		}
 		const inCrownSequence = CROWN_SEQUENCE_PHASES.has(phase);
 		const activeTarget = talking && !inCrownSequence ? hugActive ? MUSIC_VOLUME_HUG_DUCKED : MUSIC_VOLUME_DUCKED : hugActive ? MUSIC_VOLUME_HUG_FULL : MUSIC_VOLUME_FULL;
@@ -2674,26 +2733,23 @@ function App() {
 	}, [phase]);
 	const skip = () => {
 		tryPlayActive();
-		if (phase === "video") {
-			videoSceneRef.current?.togglePauseResume();
-			return;
-		}
+		if (phase === "video") return;
 		if (isIntro) {
-			setElapsed(TIMELINE.find((s) => s.phase === "introEnter").start);
+			applyElapsed(TIMELINE.find((s) => s.phase === "introEnter").start);
 			return;
 		}
 		if (phase === "introEnter") {
-			setElapsed(TIMELINE.find((s) => s.phase === "talk").start);
+			applyElapsed(TIMELINE.find((s) => s.phase === "talk").start);
 			return;
 		}
 		const pl = PHASE_LINES[phase];
 		if (pl) {
 			const nextLineStart = TIMELINE.find((s) => s.phase === phase).start + pl.lines[lineIndex].end;
-			setElapsed(Math.min(gateMs, nextLineStart));
+			applyElapsed(Math.min(gateMs, nextLineStart));
 		}
 	};
 	const replay = () => {
-		setElapsed(0);
+		applyElapsed(0);
 		setAnswered(false);
 		setVideoReleased(false);
 		setVideoAudioDone(false);
@@ -2719,7 +2775,7 @@ function App() {
 			time: now
 		};
 		const amount = isDoubleTap ? NAV_DOUBLE_TAP_JUMP_MS : NAV_JUMP_MS;
-		setElapsed((e) => Math.max(0, Math.min(gateMs, e + direction * amount)));
+		applyElapsed(Math.max(0, Math.min(gateMs, elapsedRef.current + direction * amount)));
 	};
 	const handleYes = () => {
 		if (answered) return;
@@ -2926,7 +2982,7 @@ function App() {
 				onComplete: () => setVideoReleased(true)
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: isNameCard && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
-				className: "pointer-events-none absolute inset-x-0 top-1/2 z-40 -translate-y-1/2 px-8 text-center",
+				className: "pointer-events-none absolute inset-x-0 top-[18%] z-40 -translate-y-1/2 px-8 text-center",
 				initial: {
 					opacity: 0,
 					scale: .9,
@@ -2963,6 +3019,36 @@ function App() {
 				line: dialogueLine,
 				tone: phase === "crownFly" ? "gold" : "soft"
 			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: phase === "wave" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				className: "pointer-events-none absolute inset-x-0 top-[18%] z-40 px-6 text-center",
+				initial: {
+					opacity: 0,
+					y: 12
+				},
+				animate: {
+					opacity: 1,
+					y: 0
+				},
+				exit: {
+					opacity: 0,
+					y: -8
+				},
+				transition: {
+					duration: .8,
+					delay: .4,
+					ease: "easeOut"
+				},
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "font-display text-xl leading-relaxed text-cream drop-shadow-glow sm:text-2xl",
+					children: [
+						"Sorry for taking a few minutes of your time, Mam...Thank you for watching this till the end.",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("br", {}),
+						"I hope this made u smile a little 😊",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("br", {}),
+						"Take care mam"
+					]
+				})
+			}, "goodbye-message") }),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: phase === "questionActive" && !answered && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuestionCard, {
 				questionText: QUESTION_TEXT,
 				onYes: handleYes,

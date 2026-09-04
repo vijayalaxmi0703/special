@@ -1,6 +1,6 @@
-import { t as renderErrorPage } from "../index.js";
-import { n as createCsrfMiddleware, r as createMiddleware } from "./server-B_DUVdux.js";
-//#region node_modules/@tanstack/start-client-core/dist/esm/createStart.js
+import { n as createCsrfMiddleware, r as createMiddleware } from "./server-BTKiV37f.mjs";
+import { t as renderErrorPage } from "./ssr.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/start-Dd6mdRwI.js
 function dedupeSerializationAdapters(deduped, serializationAdapters) {
 	for (let i = 0, len = serializationAdapters.length; i < len; i++) {
 		const current = serializationAdapters[i];
@@ -24,8 +24,6 @@ var createStart = (getOptions) => {
 		createMiddleware
 	};
 };
-//#endregion
-//#region src/start.ts
 var errorMiddleware = createMiddleware().server(async ({ next }) => {
 	try {
 		return await next();
