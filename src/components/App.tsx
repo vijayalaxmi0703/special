@@ -663,17 +663,30 @@ export default function App() {
      right away so buffering starts immediately rather than only on
      the first play() attempt. */
   useEffect(() => {
+    // MOBILE FIX (item 10): both tracks used to be `preload="auto"` with
+    // an immediate `.load()` call right here on mount (old FIX 9) — i.e.
+    // two full media buffers being fetched/decoded before the user has
+    // done anything, at the same time the page is also about to load
+    // images, fonts, and (later) the memory video. On mobile, competing
+    // preloads like this compete for the same limited pool of concurrent
+    // media decoder/network resources that the video scene later needs,
+    // which is exactly the kind of thing that can make an unrelated
+    // <video> further down the page fail to acquire a decoder. `preload`
+    // is now "metadata" (just enough to know duration/codec, not the
+    // whole file) and neither track is force-loaded on mount — the
+    // existing gesture-linked `activateTrack`/`primeTrack`/
+    // `activateTrackWithRetry` calls (FIX 3) already trigger the real
+    // fetch the moment the first user gesture happens, which is the
+    // earliest point the browser will actually let audio play anyway.
     const bg = new Audio("/music/background.mp4");
     bg.loop = true;
-    bg.preload = "auto";
+    bg.preload = "metadata";
     bg.volume = 0;
-    bg.load();
 
     const hug = new Audio("/music/hug.mp4");
     hug.loop = true;
-    hug.preload = "auto";
+    hug.preload = "metadata";
     hug.volume = 0;
-    hug.load();
 
     bgAudioRef.current = bg;
     hugAudioRef.current = hug;

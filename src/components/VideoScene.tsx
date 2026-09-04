@@ -482,6 +482,7 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
           ref={videoRef}
           src="/video/memory.mp4"
           playsInline
+          muted={isMuted}
           preload="metadata"
           controls={false}
           className="block w-full"
