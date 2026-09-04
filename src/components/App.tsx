@@ -121,6 +121,7 @@ const TEXT_LINES: Partial<Record<string, string[]>> = {
   yesAffirm: ["Yes… it's true. ✨", "You really are someone very special, Mam💗"],
   teacherImpact: [
     "In my eyes ur the sweetest, kindest and most amazing person💕🥰",
+     "Thank you for being someone worth looking upto",
     "You are valued, appreciated, and remembered more than you know..",
   ],
   pgCongrats: [
