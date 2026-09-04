@@ -506,55 +506,75 @@ const VideoScene = forwardRef<VideoSceneHandle, Props>(function VideoScene(
 
   const visible = active && stage !== "idle";
 
+  /* ==================================================================
+   * TEMPORARY DIAGNOSTIC TEST — visual DOM only, playback logic above
+   * this line is completely untouched.
+   *
+   * Purpose: determine whether the mobile freeze is caused by the
+   * decorative wrapper around <video> (overflow-hidden + rounded
+   * clipping + border + translucent background + boxShadow + an
+   * opacity CSS transition tied to `visible`) fighting the mobile
+   * GPU/compositor for the same resources the video decoder needs,
+   * rather than by playback itself.
+   *
+   * What changed vs. the normal build, and nothing else:
+   *   - The two nested wrapper divs collapsed into one. The remaining
+   *     div keeps ONLY what's structurally required to position the
+   *     scene and show/hide it without ever unmounting <video> (App.tsx
+   *     calls videoSceneRef.current?.prime() on the first page gesture,
+   *     long before this scene is ever active, so the element must
+   *     already exist in the DOM at that point — that's a functional
+   *     requirement, not a decorative one, so it's kept).
+   *   - Show/hide now uses `visibility` instead of an animated
+   *     `opacity`, and has NO transition — opacity animations are
+   *     specifically one of the things a compositor-contention theory
+   *     would implicate, so it's removed for this test rather than
+   *     just left at a static value.
+   *   - No overflow-hidden, no rounded corners, no border, no
+   *     background color, no boxShadow anywhere in this render.
+   *   - <video> itself has no className and no Tailwind-driven styling
+   *     at all — just the plain inline style block you specified,
+   *     unchanged from what you gave me.
+   *   - The unmute button is unchanged in behavior/logic; it's
+   *     positioned against the one remaining wrapper (still
+   *     `position: absolute`, so `absolute bottom-3 right-3` still
+   *     resolves correctly without needing its own `relative` parent).
+   * ================================================================== */
   return (
     <div
       className="absolute inset-0 z-40 flex items-end justify-center px-5"
       style={{
         paddingBottom: `${frameBottomVh}vh`,
         pointerEvents: "none",
-        opacity: visible ? 1 : 0,
-        transition: "opacity 0.6s ease",
+        visibility: visible ? "visible" : "hidden",
       }}
     >
-      {/* ITEM 8/9 — no particles, no animated glow, no backdrop-blur,
-          no animated shadow, no Framer Motion anywhere in this
-          component: the frame is a plain, visually-unchanged container
-          (same border/background as before) so the mobile GPU/decoder
-          budget goes to the actual video instead of decorative
-          effects. A short CSS opacity transition (above, and on the
-          frame below) is all that's used for entering/exiting. */}
-      <div
-        className="relative w-[96vw] max-w-3xl overflow-hidden rounded-[22px]"
+      <video
+        ref={videoRef}
+        src="/video/memory.mp4"
+        playsInline
+        muted={isMuted}
+        preload="auto"
+        controls={false}
         style={{
-          border: "1px solid rgba(247, 209, 158, 0.35)",
-          backgroundColor: "rgba(20, 10, 40, 0.55)",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.45)",
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.6s ease",
+          display: "block",
+          width: "96vw",
+          maxWidth: "768px",
+          maxHeight: `${frameMaxHVh}vh`,
+          objectFit: "contain",
         }}
-      >
-        <video
-          ref={videoRef}
-          src="/video/memory.mp4"
-          playsInline
-          muted={isMuted}
-          preload="auto"
-          controls={false}
-          className="block w-full"
-          style={{ objectFit: "contain", maxHeight: `${frameMaxHVh}vh` }}
-        />
+      />
 
-        {isMuted && (stage === "playing" || stage === "buffering") && (
-          <button
-            type="button"
-            onPointerDown={handleUnmute}
-            style={{ pointerEvents: "auto" }}
-            className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream"
-          >
-            <VolumeX size={14} /> Tap for sound
-          </button>
-        )}
-      </div>
+      {isMuted && (stage === "playing" || stage === "buffering") && (
+        <button
+          type="button"
+          onPointerDown={handleUnmute}
+          style={{ pointerEvents: "auto" }}
+          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-cream/30 bg-black/50 px-3 py-1.5 text-xs text-cream"
+        >
+          <VolumeX size={14} /> Tap for sound
+        </button>
+      )}
     </div>
   );
 });
